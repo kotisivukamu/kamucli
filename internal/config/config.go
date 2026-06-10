@@ -36,7 +36,7 @@ func (c *Config) ResolveIssuer() string {
 	if c.Endpoints.Kamuid != "" {
 		return c.Endpoints.Kamuid
 	}
-	return "http://localhost:8000"
+	return "https://accounts.kamuhub.com"
 }
 
 // ResolveClientID returns the OAuth client_id from env, config, or default.

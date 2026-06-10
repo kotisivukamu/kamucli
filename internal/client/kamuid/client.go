@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const DefaultIssuer = "http://localhost:8000"
+const DefaultIssuer = "https://accounts.kamuhub.com"
 
 type Client struct {
 	Issuer string

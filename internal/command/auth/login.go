@@ -13,7 +13,7 @@ import (
 	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
 )
 
-const defaultScope = "openid profile email organizations offline_access"
+const defaultScope = "openid profile email offline_access"
 
 type loginFlags struct {
 	scope     string
