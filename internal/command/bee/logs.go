@@ -35,7 +35,10 @@ func newLogsCmd() *cobra.Command {
 		if app == "" {
 			return fmt.Errorf("--app/-a is required (the app's name on kamubee)")
 		}
-		cfg := config.FromContext(ctx)
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
 		return runLogs(ctx, cfg, app, tail, follow)
 	})
 	c.Flags().StringVarP(&app, "app", "a", "", "App name on kamubee (required)")
