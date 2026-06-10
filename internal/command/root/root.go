@@ -1,0 +1,49 @@
+package root
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/kotisivukamu/kamu-cli/internal/command/auth"
+	"github.com/kotisivukamu/kamu-cli/internal/command/bee"
+	"github.com/kotisivukamu/kamu-cli/internal/command/db"
+	"github.com/kotisivukamu/kamu-cli/internal/command/dns"
+	"github.com/kotisivukamu/kamu-cli/internal/command/orgs"
+	"github.com/kotisivukamu/kamu-cli/internal/command/version"
+)
+
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
+func New(bi BuildInfo) *cobra.Command {
+	root := &cobra.Command{
+		Use:           "kamu",
+		Short:         "Drive the Kamu platform from one CLI",
+		Long:          "kamu is the unified CLI for the Kamu platform — manage databases (kamudb), apps (kamubee), and DNS (kamudns) with a single login against kamuid.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	root.AddGroup(
+		&cobra.Group{ID: "platform", Title: "Platform services:"},
+		&cobra.Group{ID: "account", Title: "Account & auth:"},
+		&cobra.Group{ID: "meta", Title: "More:"},
+	)
+
+	add := func(cmd *cobra.Command, group string) *cobra.Command {
+		cmd.GroupID = group
+		root.AddCommand(cmd)
+		return cmd
+	}
+
+	add(db.New(), "platform")
+	add(bee.New(), "platform")
+	add(dns.New(), "platform")
+	add(auth.New(), "account")
+	add(orgs.New(), "account")
+	add(version.New(bi.Version, bi.Commit, bi.Date), "meta")
+
+	return root
+}
