@@ -53,15 +53,22 @@ release:
   prerelease: auto
   name_template: "v{{ .Version }}"
 
-homebrew_casks:
+# NOTE: `brews:` will rename to `homebrew_formulas:` in goreleaser v3.
+# Functionally identical; flip when we bump the runner.
+brews:
   - name: kamu
     repository:
       owner: kotisivukamu
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/kotisivukamu/kamu-cli"
     description: "Unified CLI for the Kamu platform — drive kamudb, kamubee, and kamudns with one auth"
+    install: |
+      bin.install "kamu"
+    test: |
+      assert_match "kamu", shell_output("#{bin}/kamu version")
     commit_author:
       name: kamu-release-bot
       email: release-bot@kotisivukamu.fi

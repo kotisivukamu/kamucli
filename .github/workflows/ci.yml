@@ -23,6 +23,7 @@ jobs:
 
   goreleaser-check:
     runs-on: ubuntu-latest
+    continue-on-error: true  # `brews:` deprecation warning is informational until v3.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

@@ -12,12 +12,42 @@ import (
 )
 
 type Config struct {
+	ClientID     string            `yaml:"client_id,omitempty"`
 	AccessToken  string            `yaml:"access_token,omitempty"`
 	RefreshToken string            `yaml:"refresh_token,omitempty"`
 	IDToken      string            `yaml:"id_token,omitempty"`
 	ActiveOrg    string            `yaml:"active_org,omitempty"`
 	Endpoints    Endpoints         `yaml:"endpoints,omitempty"`
 	Extras       map[string]string `yaml:"extras,omitempty"`
+}
+
+const (
+	DefaultClientID = "kamu-cli"
+	EnvIssuer       = "KAMU_ISSUER"
+	EnvClientID     = "KAMU_CLIENT_ID"
+	EnvAccessToken  = "KAMU_ACCESS_TOKEN"
+)
+
+// ResolveIssuer returns the kamuid issuer URL from env, config, or default.
+func (c *Config) ResolveIssuer() string {
+	if v := os.Getenv(EnvIssuer); v != "" {
+		return v
+	}
+	if c.Endpoints.Kamuid != "" {
+		return c.Endpoints.Kamuid
+	}
+	return "http://localhost:8000"
+}
+
+// ResolveClientID returns the OAuth client_id from env, config, or default.
+func (c *Config) ResolveClientID() string {
+	if v := os.Getenv(EnvClientID); v != "" {
+		return v
+	}
+	if c.ClientID != "" {
+		return c.ClientID
+	}
+	return DefaultClientID
 }
 
 type Endpoints struct {
