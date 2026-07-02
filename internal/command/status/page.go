@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/client/kamustatus"
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/config"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
 func newPage() *cobra.Command {

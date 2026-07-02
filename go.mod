@@ -1,4 +1,4 @@
-module github.com/kotisivukamu/kamu-cli
+module github.com/kotisivukamu/kamucli
 
 go 1.25.0
 

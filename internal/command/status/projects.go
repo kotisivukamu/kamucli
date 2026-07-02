@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/client/kamustatus"
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
-	"github.com/kotisivukamu/kamu-cli/internal/render"
+	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/render"
 )
 
 func newProjects() *cobra.Command {
@@ -94,26 +94,28 @@ func newProjectsShow() *cobra.Command {
 }
 
 func newProjectsCreate() *cobra.Command {
-	var name, slug string
+	var name, slug, org string
 	cmd := command.New("create", "Create a project", "", func(ctx context.Context, _ []string) error {
 		c, err := client()
 		if err != nil {
 			return err
 		}
-		p, err := c.CreateProject(ctxOrTodo(ctx), name, slug)
+		p, err := c.CreateProject(ctxOrTodo(ctx), name, slug, org)
 		if err != nil {
 			return err
 		}
 		io := iostreams.FromContext(ctx)
 		fmt.Fprintf(io.Out, "Created project %s (/%s)\n", p.Name, p.Slug)
-		fmt.Fprintf(io.Out, "  id:      %s\n", p.ID)
-		fmt.Fprintf(io.Out, "  api key: %s\n", p.APIKey)
+		fmt.Fprintf(io.Out, "  id:  %s\n", p.ID)
+		fmt.Fprintf(io.Out, "  org: %s\n", p.KamuidOrgID)
 		return nil
 	})
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&slug, "slug", "", "URL slug")
+	cmd.Flags().StringVar(&org, "org", "", "KamuID org id that owns the project")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("slug")
+	_ = cmd.MarkFlagRequired("org")
 	return cmd
 }
 

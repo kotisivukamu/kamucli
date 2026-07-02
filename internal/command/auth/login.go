@@ -7,10 +7,10 @@ import (
 	"github.com/cli/browser"
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/client/kamuid"
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/config"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/client/kamuid"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
 // kamuid prod discovery doesn't list "organizations" in scopes_supported,

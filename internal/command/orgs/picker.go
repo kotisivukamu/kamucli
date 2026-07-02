@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kotisivukamu/kamu-cli/internal/client/kamuid"
-	"github.com/kotisivukamu/kamu-cli/internal/config"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
-	"github.com/kotisivukamu/kamu-cli/internal/picker"
+	"github.com/kotisivukamu/kamucli/internal/client/kamuid"
+	"github.com/kotisivukamu/kamucli/internal/config"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/picker"
 )
 
 func runPicker(ctx context.Context) error {

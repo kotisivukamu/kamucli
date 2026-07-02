@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/command"
 )
 
 func New() *cobra.Command {
@@ -23,6 +23,6 @@ func New() *cobra.Command {
 
 func stub(use, short, milestone string) *cobra.Command {
 	return command.New(use, short, "", func(ctx context.Context, _ []string) error {
-		return errors.New("not implemented yet — tracked in kotisivukamu/kamu-cli#1 " + milestone)
+		return errors.New("not implemented yet — tracked in kotisivukamu/kamucli#1 " + milestone)
 	})
 }

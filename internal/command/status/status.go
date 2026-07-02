@@ -9,23 +9,25 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/client/kamustatus"
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/config"
+	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
 )
 
 const (
-	// EnvAPIKey holds a project-scoped km_ key. Required until kamustatus#5
-	// (JWT auth) lands, after which we'll use the kamuid access token.
-	EnvAPIKey = "KAMU_KAMUSTATUS_API_KEY"
-	EnvURL    = "KAMU_KAMUSTATUS_URL"
-
-	// ExtraAPIKey is the config.Extras key under which a stored km_ key lives.
-	ExtraAPIKey = "kamustatus_api_key"
+	// EnvAccessKey holds a kamuhub access key (a scoped, signed platform
+	// context), same as `kamu sites`. Takes precedence over the login token.
+	EnvAccessKey = "KAMU_ACCESS_KEY"
+	EnvURL       = "KAMU_KAMUSTATUS_URL"
 )
+
+// keyFlag is the --key persistent flag value (a kamuhub access key), shared by
+// every `kamu status` subcommand, mirroring `kamu sites`/`kamu dns`.
+var keyFlag string
 
 func New() *cobra.Command {
 	cmd := command.New("status", "Manage kamustatus monitors and status pages", "", nil)
+	cmd.PersistentFlags().StringVar(&keyFlag, "key", "", "kamuhub access key (or "+EnvAccessKey+")")
 	cmd.AddCommand(
 		newProjects(),
 		newMonitors(),
@@ -47,21 +49,28 @@ func client() (*kamustatus.Client, error) {
 		baseURL = cfg.Endpoints.Kamustatus
 	}
 
-	apiKey := os.Getenv(EnvAPIKey)
-	if apiKey == "" && cfg.Extras != nil {
-		apiKey = cfg.Extras[ExtraAPIKey]
+	// Unified platform identity: --key / KAMU_ACCESS_KEY (a kamuhub access key,
+	// same as `kamu sites`/`kamu dns`), else the KamuID access token from
+	// `kamu auth login`. kamustatus is a resource server and accepts either.
+	token := keyFlag
+	if token == "" {
+		token = os.Getenv(EnvAccessKey)
 	}
-	if apiKey == "" {
-		return nil, errors.New(`no kamustatus API key configured.
-
-Until kamustatus accepts kamuid JWTs (kontakto-fi/kamustatus#5), set a
-project-scoped key from the dashboard:
-
-    export ` + EnvAPIKey + `=km_...
-
-Or add it to ~/.kamu/config.yml under extras.kamustatus_api_key.`)
+	if token == "" {
+		token = cfg.AccessToken
 	}
-	return kamustatus.New(baseURL, apiKey), nil
+	if token == "" {
+		return nil, errors.New(`not authenticated.
+
+Run the unified login:
+
+    kamu auth login
+
+or present a kamuhub access key (Manage -> Access keys in the dashboard):
+
+    export ` + EnvAccessKey + `=...`)
+	}
+	return kamustatus.New(baseURL, token), nil
 }
 
 // ctxOrTodo guards against a nil context from the run path; cobra normally

@@ -1,7 +1,9 @@
-// Package kamustatus is a thin HTTP client for the kamustatus API
-// (https://github.com/kontakto-fi/kamustatus). Until kamustatus accepts kamuid
-// JWTs (kamustatus#5), the CLI authenticates with a project-scoped km_ key
-// read from env or config.
+// Package kamustatus is a thin HTTP client for the kamustatus API. kamustatus is
+// a kamuhub resource server, so the CLI authenticates with the platform identity
+// — a kamuhub access key (a scoped, signed platform context) or a KamuID access
+// token from `kamu auth login` — presented as the bearer. kamustatus verifies it
+// (JWKS for an access key, /userinfo for a KamuID token) and reads identity +
+// orgs from it. No project-scoped km_ keys.
 package kamustatus
 
 import (
@@ -14,21 +16,21 @@ import (
 	"strings"
 )
 
-const DefaultBaseURL = "https://api.kamustatus.com"
+const DefaultBaseURL = "https://kamustatus-api.fly.dev"
 
 type Client struct {
 	BaseURL    string
-	APIKey     string
+	Token      string // kamuhub access key or KamuID access token, sent as the bearer
 	HTTPClient *http.Client
 }
 
-func New(baseURL, apiKey string) *Client {
+func New(baseURL, token string) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
 	return &Client{
 		BaseURL:    strings.TrimRight(baseURL, "/"),
-		APIKey:     apiKey,
+		Token:      token,
 		HTTPClient: http.DefaultClient,
 	}
 }
@@ -54,7 +56,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body any) (json.Ra
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)
@@ -108,7 +110,7 @@ type Project struct {
 	ID                  string `json:"id"`
 	Name                string `json:"name"`
 	Slug                string `json:"slug"`
-	APIKey              string `json:"api_key"`
+	KamuidOrgID         string `json:"kamuid_org_id"`
 	PublicStatusEnabled bool   `json:"public_status_enabled"`
 	CreatedAt           string `json:"created_at"`
 }
@@ -140,8 +142,10 @@ func (c *Client) GetProject(ctx context.Context, id string) (json.RawMessage, er
 	return c.Do(ctx, "GET", "/projects/"+id, nil)
 }
 
-func (c *Client) CreateProject(ctx context.Context, name, slug string) (*Project, error) {
-	data, err := c.Do(ctx, "POST", "/projects", map[string]string{"name": name, "slug": slug})
+func (c *Client) CreateProject(ctx context.Context, name, slug, kamuidOrgID string) (*Project, error) {
+	data, err := c.Do(ctx, "POST", "/projects", map[string]string{
+		"name": name, "slug": slug, "kamuid_org_id": kamuidOrgID,
+	})
 	if err != nil {
 		return nil, err
 	}

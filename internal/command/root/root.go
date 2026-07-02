@@ -3,13 +3,14 @@ package root
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/command/auth"
-	"github.com/kotisivukamu/kamu-cli/internal/command/bee"
-	"github.com/kotisivukamu/kamu-cli/internal/command/db"
-	"github.com/kotisivukamu/kamu-cli/internal/command/dns"
-	"github.com/kotisivukamu/kamu-cli/internal/command/orgs"
-	"github.com/kotisivukamu/kamu-cli/internal/command/status"
-	"github.com/kotisivukamu/kamu-cli/internal/command/version"
+	"github.com/kotisivukamu/kamucli/internal/command/auth"
+	"github.com/kotisivukamu/kamucli/internal/command/bee"
+	"github.com/kotisivukamu/kamucli/internal/command/db"
+	"github.com/kotisivukamu/kamucli/internal/command/dns"
+	"github.com/kotisivukamu/kamucli/internal/command/orgs"
+	"github.com/kotisivukamu/kamucli/internal/command/sites"
+	"github.com/kotisivukamu/kamucli/internal/command/status"
+	"github.com/kotisivukamu/kamucli/internal/command/version"
 )
 
 type BuildInfo struct {
@@ -39,6 +40,7 @@ func New(bi BuildInfo) *cobra.Command {
 		return cmd
 	}
 
+	add(sites.New(), "platform")
 	add(db.New(), "platform")
 	add(bee.New(), "platform")
 	add(dns.New(), "platform")

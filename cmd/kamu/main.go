@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kotisivukamu/kamu-cli/internal/command/root"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/command/root"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
 var (

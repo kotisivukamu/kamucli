@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
-	"github.com/kotisivukamu/kamu-cli/internal/render"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/render"
 )
 
 func newAlerts() *cobra.Command {

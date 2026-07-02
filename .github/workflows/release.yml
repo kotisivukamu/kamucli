@@ -1,5 +1,11 @@
 name: release
 
+# Release lane for the kamu CLI. This is a standalone public repo again
+# (un-folded from the kamuhub monorepo, 2026-07-02), so releases run off plain
+# `vX.Y.Z` tags — no `cli/` prefix, no version stripping, no workdir override.
+# GoReleaser cross-compiles darwin/linux amd64+arm64, publishes the GitHub
+# release, and pushes the Homebrew formula to kotisivukamu/homebrew-tap
+# (HOMEBREW_TAP_TOKEN; skipped gracefully if unset).
 on:
   push:
     tags: ['v*']

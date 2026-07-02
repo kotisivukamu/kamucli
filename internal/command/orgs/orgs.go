@@ -3,8 +3,8 @@ package orgs
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamu-cli/internal/command"
-	"github.com/kotisivukamu/kamu-cli/internal/iostreams"
+	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
 func New() *cobra.Command {

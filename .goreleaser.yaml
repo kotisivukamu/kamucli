@@ -2,6 +2,11 @@ version: 2
 
 project_name: kamu
 
+# kamu is a standalone public repo again (un-folded from the kamuhub monorepo,
+# 2026-07-02). Releases run off plain `vX.Y.Z` tags via
+# .github/workflows/release.yml. Versions continue the original public line
+# (v0.4.1 → v0.5.0) so brew upgrades stay monotonic.
+
 before:
   hooks:
     - go mod tidy
@@ -48,22 +53,30 @@ changelog:
 release:
   github:
     owner: kotisivukamu
-    name: kamu-cli
+    name: kamucli
   draft: false
   prerelease: auto
   name_template: "v{{ .Version }}"
+  # Re-tagging the same version replaces the release + its assets instead of
+  # 422-ing on "asset already_exists", so a re-run of a version is idempotent.
+  mode: replace
 
 # NOTE: `brews:` will rename to `homebrew_formulas:` in goreleaser v3.
 # Functionally identical; flip when we bump the runner.
 brews:
   - name: kamu
+    # Publish the formula to the tap only when HOMEBREW_TAP_TOKEN is set. Without
+    # it, skip the tap push so the release still ships binaries (go install /
+    # direct download) instead of failing the whole release on a 401. Set the
+    # secret to auto-enable `brew install kotisivukamu/tap/kamu`.
+    skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
     repository:
       owner: kotisivukamu
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/kotisivukamu/kamu-cli"
+    homepage: "https://github.com/kotisivukamu/kamucli"
     description: "Unified CLI for the Kamu platform — drive kamudb, kamubee, and kamudns with one auth"
     install: |
       bin.install "kamu"
