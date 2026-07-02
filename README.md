@@ -8,7 +8,7 @@ kamu db list
 kamu bee apps
 kamu dns zones
 kamu sites list
-kamu sites clone my-site
+kamu clone my-project
 kamu status projects list
 ```
 
@@ -16,27 +16,30 @@ kamu status projects list
 unified platform identity — the `kamu auth login` token, or a kamuhub access key
 (`export KAMU_ACCESS_KEY=...`, same as `kamu sites`). No project-scoped keys.
 
-`kamu sites clone <site>` clones a site's git repository over HTTPS with
-short-lived, repo-scoped credentials minted per operation (~2h expiry) —
-no SSH keys, nothing stored on disk. The clone installs `kamu git-credential`
-as the repo-local credential helper, so plain `git pull` / `git push` just
-work afterwards: git asks the helper, the helper mints a fresh credential.
+`kamu clone <project>` clones a project's git repository over HTTPS from the
+platform forge (`git.kamuhub.com`), which hosts repos for **every** project
+type — git access is a platform capability, not a sites feature. Your kamuhub
+access key is the git credential: the clone hands it to git in memory (never
+in the URL, never on disk), and installs `kamu git-credential` as the
+repo-local credential helper, so plain `git pull` / `git push` just work
+afterwards — git asks the helper, the helper presents the key.
 
 ## Working with agents
 
 The credential-helper flow means any coding agent (or CI job) that shells out
-to ordinary `git` just works inside a cloned site repo — no token pasting, no
-remote-URL surgery. On a headless box, set a scoped kamuhub access key
+to ordinary `git` just works inside a cloned repo — no token pasting, no
+remote-URL surgery. Give the agent's box a scoped kamuhub access key
 (dashboard → Manage → Access keys):
 
 ```sh
 export KAMU_ACCESS_KEY=...
-kamu sites clone my-site
-cd my-site && git push   # credentials minted on the fly, expire in ~2h
+kamu clone my-project
+cd my-project && git push   # every git operation presents the access key
 ```
 
 Access keys are scoped to a subset of your grants, TTL'd, and revocable from
-the dashboard — whatever is on the machine is the most an agent can use.
+the dashboard — whatever is on the machine is the most an agent can use, and
+revoking the key cuts its git access instantly, platform-side.
 
 ## Install
 

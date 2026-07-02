@@ -21,8 +21,8 @@ import (
 const DefaultBaseURL = "https://app.kamuhub.com"
 
 // APIError is a kamusites API failure. StatusCode lets callers map specific
-// statuses to friendlier guidance (e.g. 409 from git-credentials = the site
-// has no repo yet); Error() keeps the plain rendering everyone else prints.
+// statuses to friendlier guidance; Error() keeps the plain rendering everyone
+// else prints.
 type APIError struct {
 	StatusCode int
 	Message    string
@@ -187,30 +187,6 @@ func (c *Client) TriggerBuild(ctx context.Context, siteID string, brief Brief, i
 		return nil, err
 	}
 	return &r.Build, nil
-}
-
-// GitCredentials is a short-lived, repo-scoped credential for a site's git
-// smart-HTTP remote, minted per operation by POST /sites/{id}/git-credentials.
-type GitCredentials struct {
-	CloneURL      string `json:"clone_url"`
-	Username      string `json:"username"` // cosmetic; the proxy reads only the password
-	Password      string `json:"password"` // ~2h repo-scoped JWT
-	ExpiresAt     string `json:"expires_at"`
-	DefaultBranch string `json:"default_branch"`
-	RepoOwner     string `json:"repo_owner"`
-	RepoName      string `json:"repo_name"`
-}
-
-// GitCredentials mints git credentials for the site's repo. Grant-checked
-// server-side on sites.update (any credential the git proxy accepts can push).
-// NEVER persist the password — hand it to git in memory and let it expire.
-// 404 = site not in the key's scope; 409 = the site has no repo yet.
-func (c *Client) GitCredentials(ctx context.Context, siteID string) (*GitCredentials, error) {
-	var r GitCredentials
-	if err := c.do(ctx, "POST", "/sites/"+siteID+"/git-credentials", nil, &r); err != nil {
-		return nil, err
-	}
-	return &r, nil
 }
 
 // UploadMaterial uploads one file to a site's materials (Tigris, keyed by site

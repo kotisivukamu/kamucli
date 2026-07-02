@@ -1,13 +1,14 @@
 // Package gitcredential implements the hidden `kamu git-credential` command —
-// the git credential helper that `kamu sites clone` installs repo-locally.
-// git invokes it as `kamu git-credential <get|store|erase>` with key=value
+// the git credential helper that `kamu clone` installs repo-locally. git
+// invokes it as `kamu git-credential <get|store|erase>` with key=value
 // attribute lines on stdin (terminated by a blank line or EOF).
 //
-// `get` mints a fresh short-lived credential for the repo's site (identified
-// by the repo-local `git config kamu.site-id` stamped at clone time) through
-// the kamusites git-credentials endpoint, on the same access-key rail as the
-// other `kamu sites` commands. Nothing is ever persisted, so `store` and
-// `erase` are no-ops.
+// `get` answers with the kamuhub access key itself: the platform forge
+// (git.kamuhub.com, kamuhub ADR 0005) accepts the access key as the git
+// smart-HTTP password directly, so there is nothing to mint and nothing to
+// persist — `store` and `erase` are no-ops. The helper only speaks for repos
+// stamped with `git config kamu.project` at clone time, and only for the
+// forge's own host, so the key never leaks to unrelated remotes.
 package gitcredential
 
 import (
@@ -23,19 +24,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamucli/internal/client/kamusites"
+	"github.com/kotisivukamu/kamucli/internal/client/forge"
 	"github.com/kotisivukamu/kamucli/internal/command"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
-const (
-	envKey = "KAMU_ACCESS_KEY"
-	envURL = "KAMU_KAMUSITES_URL"
-)
+const envKey = "KAMU_ACCESS_KEY"
 
 func New() *cobra.Command {
-	cmd := command.New("git-credential <get|store|erase>", "Git credential helper for kamu site repos",
-		"Git credential helper protocol backend, installed repo-locally by `kamu sites clone`. Not meant to be run by hand.",
+	cmd := command.New("git-credential <get|store|erase>", "Git credential helper for kamu project repos",
+		"Git credential helper protocol backend, installed repo-locally by `kamu clone`. Not meant to be run by hand.",
 		run)
 	cmd.Hidden = true
 	cmd.Args = cobra.ExactArgs(1)
@@ -55,54 +53,54 @@ func run(ctx context.Context, args []string) error {
 	case "get":
 		return get(ctx, io, attrs)
 	case "store", "erase":
-		// Tokens are ephemeral by design; there is nothing to store or revoke.
+		// The credential is the access key itself; there is nothing to store or
+		// revoke here (revocation is instant platform-side).
 		return nil
 	}
 	return fmt.Errorf("unknown credential action %q (want get, store, or erase)", args[0])
 }
 
-// get mints a credential for the enclosing repo's site and speaks it back in
-// the credential-helper protocol. Failures go to stderr with a non-zero exit
-// (git surfaces the message), so the fix — usually a missing KAMU_ACCESS_KEY
-// on a fresh shell — is visible instead of a silent auth prompt.
+// get speaks the access key back in the credential-helper protocol. Failures
+// go to stderr with a non-zero exit (git surfaces the message), so the fix —
+// usually a missing KAMU_ACCESS_KEY on a fresh shell — is visible instead of
+// a silent auth prompt.
 func get(ctx context.Context, io *iostreams.IOStreams, attrs map[string]string) error {
-	siteID, err := repoSiteID(ctx)
-	if err != nil {
-		return errors.New("not a kamu site repo (git config kamu.site-id is unset) — clone with `kamu sites clone`")
+	// The kamu.project stamp is the "this is a kamu repo" marker: without it,
+	// stay out of the way entirely so the helper is inert in non-kamu repos
+	// (git configs can leak in via includes; better to fail loudly here than
+	// answer for a repo we never cloned).
+	if _, err := repoProject(ctx); err != nil {
+		return errors.New("not a kamu project repo (git config kamu.project is unset) — clone with `kamu clone`")
+	}
+	// Only answer for the platform forge's own host: a repo can have other
+	// remotes, and git asks every configured helper about each of them.
+	// Staying silent (exit 0, no output) lets git fall through to its other
+	// helpers without ever leaking the access key to an unrelated host.
+	if !hostMatches(attrs, forge.BaseURL()) {
+		return nil
 	}
 	key := os.Getenv(envKey)
 	if key == "" {
 		return errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and export " + envKey + "=...")
 	}
-	creds, err := kamusites.New(os.Getenv(envURL), key).GitCredentials(ctx, siteID)
-	if err != nil {
-		return err
-	}
-	// Only answer for the host our credential is actually for: a repo can have
-	// other remotes, and git asks every configured helper about each of them.
-	// Staying silent (exit 0, no output) lets git fall through to its other
-	// helpers without ever leaking the token to an unrelated host.
-	if !hostMatches(attrs, creds.CloneURL) {
-		return nil
-	}
-	fmt.Fprintf(io.Out, "username=%s\n", creds.Username)
-	fmt.Fprintf(io.Out, "password=%s\n", creds.Password)
+	fmt.Fprintln(io.Out, "username=kamu") // cosmetic; the forge reads only the password
+	fmt.Fprintf(io.Out, "password=%s\n", key)
 	return nil
 }
 
-// repoSiteID reads the site id stamped by `kamu sites clone`. git runs
+// repoProject reads the owner/name stamped by `kamu clone`. git runs
 // credential helpers with the repo as cwd, so plain `git config` resolves the
 // repo-local value.
-func repoSiteID(ctx context.Context) (string, error) {
-	out, err := exec.CommandContext(ctx, "git", "config", "--get", "kamu.site-id").Output()
+func repoProject(ctx context.Context) (string, error) {
+	out, err := exec.CommandContext(ctx, "git", "config", "--get", "kamu.project").Output()
 	if err != nil {
 		return "", err
 	}
-	id := strings.TrimSpace(string(out))
-	if id == "" {
-		return "", errors.New("kamu.site-id is empty")
+	p := strings.TrimSpace(string(out))
+	if p == "" {
+		return "", errors.New("kamu.project is empty")
 	}
-	return id, nil
+	return p, nil
 }
 
 // parseAttrs reads the credential-helper protocol's key=value input: one
@@ -125,10 +123,10 @@ func parseAttrs(r io.Reader) (map[string]string, error) {
 }
 
 // hostMatches reports whether git's credential request (protocol/host attrs)
-// is for the same place the minted clone_url points at. git includes the port
-// in the host attribute when non-default, matching url.URL's Host.
-func hostMatches(attrs map[string]string, cloneURL string) bool {
-	u, err := url.Parse(cloneURL)
+// is for the forge base URL the key belongs to. git includes the port in the
+// host attribute when non-default, matching url.URL's Host.
+func hostMatches(attrs map[string]string, base string) bool {
+	u, err := url.Parse(base)
 	if err != nil {
 		return false
 	}

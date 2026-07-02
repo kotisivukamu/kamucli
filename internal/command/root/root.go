@@ -5,6 +5,7 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/command/auth"
 	"github.com/kotisivukamu/kamucli/internal/command/bee"
+	"github.com/kotisivukamu/kamucli/internal/command/clone"
 	"github.com/kotisivukamu/kamucli/internal/command/db"
 	"github.com/kotisivukamu/kamucli/internal/command/dns"
 	"github.com/kotisivukamu/kamucli/internal/command/gitcredential"
@@ -41,6 +42,7 @@ func New(bi BuildInfo) *cobra.Command {
 		return cmd
 	}
 
+	add(clone.New(), "platform")
 	add(sites.New(), "platform")
 	add(db.New(), "platform")
 	add(bee.New(), "platform")
@@ -50,7 +52,7 @@ func New(bi BuildInfo) *cobra.Command {
 	add(orgs.New(), "account")
 	add(version.New(bi.Version, bi.Commit, bi.Date), "meta")
 
-	// Hidden plumbing: the git credential helper `kamu sites clone` installs
+	// Hidden plumbing: the git credential helper `kamu clone` installs
 	// repo-locally. No group — it never shows in help.
 	root.AddCommand(gitcredential.New())
 

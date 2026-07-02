@@ -7,11 +7,11 @@ import (
 
 func TestParseAttrs(t *testing.T) {
 	t.Run("reads key=value lines", func(t *testing.T) {
-		attrs, err := parseAttrs(strings.NewReader("protocol=https\nhost=kamusites-api.fly.dev\npath=git/o/r.git\n\n"))
+		attrs, err := parseAttrs(strings.NewReader("protocol=https\nhost=git.kamuhub.com\npath=o/r.git\n\n"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if attrs["protocol"] != "https" || attrs["host"] != "kamusites-api.fly.dev" || attrs["path"] != "git/o/r.git" {
+		if attrs["protocol"] != "https" || attrs["host"] != "git.kamuhub.com" || attrs["path"] != "o/r.git" {
 			t.Fatalf("unexpected attrs: %v", attrs)
 		}
 	})
@@ -64,7 +64,7 @@ func TestParseAttrs(t *testing.T) {
 }
 
 func TestHostMatches(t *testing.T) {
-	const cloneURL = "https://kamusites-api.fly.dev/git/owner/repo.git"
+	const gitBase = "https://git.kamuhub.com"
 
 	cases := []struct {
 		name  string
@@ -72,13 +72,13 @@ func TestHostMatches(t *testing.T) {
 		url   string
 		want  bool
 	}{
-		{"same protocol and host", map[string]string{"protocol": "https", "host": "kamusites-api.fly.dev"}, cloneURL, true},
-		{"different host", map[string]string{"protocol": "https", "host": "github.com"}, cloneURL, false},
-		{"different protocol", map[string]string{"protocol": "http", "host": "kamusites-api.fly.dev"}, cloneURL, false},
-		{"port must match", map[string]string{"protocol": "https", "host": "kamusites-api.fly.dev:8443"}, cloneURL, false},
-		{"port matches when in clone url", map[string]string{"protocol": "https", "host": "localhost:8787"}, "https://localhost:8787/git/o/r.git", true},
-		{"no attrs matches (site-id gate already passed)", map[string]string{}, cloneURL, true},
-		{"unparseable clone url never matches", map[string]string{"host": "kamusites-api.fly.dev"}, "://bad", false},
+		{"same protocol and host", map[string]string{"protocol": "https", "host": "git.kamuhub.com"}, gitBase, true},
+		{"different host", map[string]string{"protocol": "https", "host": "github.com"}, gitBase, false},
+		{"different protocol", map[string]string{"protocol": "http", "host": "git.kamuhub.com"}, gitBase, false},
+		{"port must match", map[string]string{"protocol": "https", "host": "git.kamuhub.com:8443"}, gitBase, false},
+		{"port matches when in base", map[string]string{"protocol": "https", "host": "localhost:8787"}, "https://localhost:8787", true},
+		{"no attrs matches (kamu.project gate already passed)", map[string]string{}, gitBase, true},
+		{"unparseable base never matches", map[string]string{"host": "git.kamuhub.com"}, "://bad", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
