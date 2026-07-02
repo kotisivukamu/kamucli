@@ -8,12 +8,35 @@ kamu db list
 kamu bee apps
 kamu dns zones
 kamu sites list
+kamu sites clone my-site
 kamu status projects list
 ```
 
 `kamu status` talks to **kamustatus**, a kamuhub resource server. It uses the
 unified platform identity — the `kamu auth login` token, or a kamuhub access key
 (`export KAMU_ACCESS_KEY=...`, same as `kamu sites`). No project-scoped keys.
+
+`kamu sites clone <site>` clones a site's git repository over HTTPS with
+short-lived, repo-scoped credentials minted per operation (~2h expiry) —
+no SSH keys, nothing stored on disk. The clone installs `kamu git-credential`
+as the repo-local credential helper, so plain `git pull` / `git push` just
+work afterwards: git asks the helper, the helper mints a fresh credential.
+
+## Working with agents
+
+The credential-helper flow means any coding agent (or CI job) that shells out
+to ordinary `git` just works inside a cloned site repo — no token pasting, no
+remote-URL surgery. On a headless box, set a scoped kamuhub access key
+(dashboard → Manage → Access keys):
+
+```sh
+export KAMU_ACCESS_KEY=...
+kamu sites clone my-site
+cd my-site && git push   # credentials minted on the fly, expire in ~2h
+```
+
+Access keys are scoped to a subset of your grants, TTL'd, and revocable from
+the dashboard — whatever is on the machine is the most an agent can use.
 
 ## Install
 

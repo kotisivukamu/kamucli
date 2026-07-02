@@ -7,6 +7,7 @@ import (
 	"github.com/kotisivukamu/kamucli/internal/command/bee"
 	"github.com/kotisivukamu/kamucli/internal/command/db"
 	"github.com/kotisivukamu/kamucli/internal/command/dns"
+	"github.com/kotisivukamu/kamucli/internal/command/gitcredential"
 	"github.com/kotisivukamu/kamucli/internal/command/orgs"
 	"github.com/kotisivukamu/kamucli/internal/command/sites"
 	"github.com/kotisivukamu/kamucli/internal/command/status"
@@ -48,6 +49,10 @@ func New(bi BuildInfo) *cobra.Command {
 	add(auth.New(), "account")
 	add(orgs.New(), "account")
 	add(version.New(bi.Version, bi.Commit, bi.Date), "meta")
+
+	// Hidden plumbing: the git credential helper `kamu sites clone` installs
+	// repo-locally. No group — it never shows in help.
+	root.AddCommand(gitcredential.New())
 
 	return root
 }

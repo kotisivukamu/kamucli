@@ -61,6 +61,7 @@ func New() *cobra.Command {
 	cmd := command.New("sites", "Create and build websites on kamusites", "", nil)
 	cmd.AddCommand(newCreate())
 	cmd.AddCommand(newList())
+	cmd.AddCommand(newClone())
 	cmd.AddCommand(newDelete())
 	return cmd
 }
