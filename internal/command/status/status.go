@@ -11,12 +11,13 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
 	"github.com/kotisivukamu/kamucli/internal/command"
-	"github.com/kotisivukamu/kamucli/internal/config"
 )
 
 const (
 	// EnvAccessKey holds a kamuhub access key (a scoped, signed platform
-	// context), same as `kamu sites`. Takes precedence over the login token.
+	// context), same as `kamu sites`/`kamu dns`. This is the only credential
+	// `kamu status` accepts: kamustatus is now reached through the kamuhub BFF,
+	// which requires the signed platform context.
 	EnvAccessKey = "KAMU_ACCESS_KEY"
 	EnvURL       = "KAMU_KAMUSTATUS_URL"
 )
@@ -37,40 +38,21 @@ func New() *cobra.Command {
 	return cmd
 }
 
-// client resolves config + auth and returns a ready kamustatus client.
+// client resolves the kamuhub access key (--key then env) and builds a
+// kamustatus client pointed at the BFF, exactly like `kamu sites`/`kamu dns`.
+// The raw KamuID access token from `kamu auth login` is deliberately NOT
+// accepted: kamustatus (a resource server) now requires the BFF-signed
+// X-Kamuhub-Authz context, which only the access-key path through the front
+// door carries.
 func client() (*kamustatus.Client, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, err
+	key := keyFlag
+	if key == "" {
+		key = os.Getenv(EnvAccessKey)
 	}
-
-	baseURL := os.Getenv(EnvURL)
-	if baseURL == "" {
-		baseURL = cfg.Endpoints.Kamustatus
+	if key == "" {
+		return nil, errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and pass it:\n\n    export " + EnvAccessKey + "=...\n\nor --key <token>")
 	}
-
-	// Unified platform identity: --key / KAMU_ACCESS_KEY (a kamuhub access key,
-	// same as `kamu sites`/`kamu dns`), else the KamuID access token from
-	// `kamu auth login`. kamustatus is a resource server and accepts either.
-	token := keyFlag
-	if token == "" {
-		token = os.Getenv(EnvAccessKey)
-	}
-	if token == "" {
-		token = cfg.AccessToken
-	}
-	if token == "" {
-		return nil, errors.New(`not authenticated.
-
-Run the unified login:
-
-    kamu auth login
-
-or present a kamuhub access key (Manage -> Access keys in the dashboard):
-
-    export ` + EnvAccessKey + `=...`)
-	}
-	return kamustatus.New(baseURL, token), nil
+	return kamustatus.New(os.Getenv(EnvURL), key), nil
 }
 
 // ctxOrTodo guards against a nil context from the run path; cobra normally

@@ -22,9 +22,15 @@ func newPage() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		// Public status pages are served by kamustatus directly (the BFF does not
+		// proxy /status/:slug), so this path targets kamustatus itself, not the
+		// front door that the authenticated commands use.
 		baseURL := os.Getenv(EnvURL)
 		if baseURL == "" {
 			baseURL = cfg.Endpoints.Kamustatus
+		}
+		if baseURL == "" {
+			baseURL = kamustatus.PublicBaseURL
 		}
 		c := kamustatus.New(baseURL, "")
 		data, err := c.GetPublicStatus(ctxOrTodo(ctx), args[0])

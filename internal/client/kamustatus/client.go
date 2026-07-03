@@ -1,9 +1,13 @@
-// Package kamustatus is a thin HTTP client for the kamustatus API. kamustatus is
-// a kamuhub resource server, so the CLI authenticates with the platform identity
-// — a kamuhub access key (a scoped, signed platform context) or a KamuID access
-// token from `kamu auth login` — presented as the bearer. kamustatus verifies it
-// (JWKS for an access key, /userinfo for a KamuID token) and reads identity +
-// orgs from it. No project-scoped km_ keys.
+// Package kamustatus is a thin HTTP client for kamustatus, reached THROUGH the
+// kamuhub front door (app.kamuhub.com) so the request is journaled (and gated)
+// before it reaches the product. The CLI sends a kamuhub access key as the
+// bearer; the BFF verifies it, checks revocation, injects the signed
+// X-Kamuhub-Authz context, and forwards to kamustatus (which re-verifies via
+// JWKS). The BFF strips the /api/status prefix and forwards to kamustatus's bare
+// /api (so /api/status/projects -> <kamustatus>/api/projects); the client bakes
+// that prefix in. Override the base with KAMU_KAMUSTATUS_URL (local dev /
+// fallback). Public status pages (/status/:slug) are served by kamustatus
+// directly, NOT via the BFF — see PublicBaseURL.
 package kamustatus
 
 import (
@@ -16,29 +20,35 @@ import (
 	"strings"
 )
 
-const DefaultBaseURL = "https://kamustatus-api.fly.dev"
+const DefaultBaseURL = "https://app.kamuhub.com"
+
+// PublicBaseURL is kamustatus itself. Public status pages (/status/:slug) are
+// unauthenticated and served by kamustatus directly, not proxied by the BFF, so
+// GetPublic targets this rather than the front door.
+const PublicBaseURL = "https://kamustatus-api.fly.dev"
 
 type Client struct {
 	BaseURL    string
-	Token      string // kamuhub access key or KamuID access token, sent as the bearer
+	Key        string // kamuhub access key, sent as the bearer
 	HTTPClient *http.Client
 }
 
-func New(baseURL, token string) *Client {
+func New(baseURL, key string) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
 	return &Client{
 		BaseURL:    strings.TrimRight(baseURL, "/"),
-		Token:      token,
+		Key:        key,
 		HTTPClient: http.DefaultClient,
 	}
 }
 
 // Do issues an authenticated API request and returns the raw response body.
-// path must begin with "/" and is appended to BaseURL+"/api".
+// path must begin with "/" and is appended to BaseURL+"/api/status" — the BFF
+// prefix it strips before forwarding to kamustatus's bare /api.
 func (c *Client) Do(ctx context.Context, method, path string, body any) (json.RawMessage, error) {
-	url := c.BaseURL + "/api" + path
+	url := c.BaseURL + "/api/status" + path
 
 	var reqBody io.Reader
 	if body != nil {
@@ -56,7 +66,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body any) (json.Ra
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Authorization", "Bearer "+c.Key)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)
