@@ -147,13 +147,11 @@ func runClone(ctx context.Context, args []string, key string) error {
 // resolveKey pulls the access key from --key or the env, with the same guidance
 // the sites commands give.
 func resolveKey(key string) (string, error) {
-	if key == "" {
-		key = os.Getenv(envKey)
+	k := config.ResolveAccessKey(key)
+	if k == "" {
+		return "", errors.New("no access key. Run `kamu login`, or export " + envKey + "=... or pass --key <token>")
 	}
-	if key == "" {
-		return "", errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and pass it:\n\n    export " + envKey + "=...\n\nor --key <token>")
-	}
-	return key, nil
+	return k, nil
 }
 
 // chooseRepo resolves the <project> argument (or its absence) to exactly one

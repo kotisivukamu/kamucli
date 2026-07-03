@@ -49,6 +49,7 @@ func New(bi BuildInfo) *cobra.Command {
 	add(dns.New(), "platform")
 	add(status.New(), "platform")
 	add(auth.New(), "account")
+	add(auth.NewLogin(), "account") // top-level `kamu login` alias for `kamu auth login`
 	add(orgs.New(), "account")
 	add(version.New(bi.Version, bi.Commit, bi.Date), "meta")
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/client/kamudns"
 	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
@@ -38,13 +39,11 @@ func New() *cobra.Command {
 
 // client resolves the access key (flag then env) and builds a kamudns client.
 func client(key string) (*kamudns.Client, error) {
-	if key == "" {
-		key = os.Getenv(envKey)
+	k := config.ResolveAccessKey(key)
+	if k == "" {
+		return nil, errors.New("no access key. Run `kamu login`, or export " + envKey + "=... or pass --key <token>")
 	}
-	if key == "" {
-		return nil, errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and pass it:\n\n    export " + envKey + "=...\n\nor --key <token>")
-	}
-	return kamudns.New(os.Getenv(envURL), key), nil
+	return kamudns.New(os.Getenv(envURL), k), nil
 }
 
 // resolveDomain maps a domain name OR id to a managed zone's id. A bare id

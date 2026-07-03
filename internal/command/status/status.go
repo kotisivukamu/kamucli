@@ -11,6 +11,7 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
 	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
 )
 
 const (
@@ -45,12 +46,9 @@ func New() *cobra.Command {
 // X-Kamuhub-Authz context, which only the access-key path through the front
 // door carries.
 func client() (*kamustatus.Client, error) {
-	key := keyFlag
+	key := config.ResolveAccessKey(keyFlag)
 	if key == "" {
-		key = os.Getenv(EnvAccessKey)
-	}
-	if key == "" {
-		return nil, errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and pass it:\n\n    export " + EnvAccessKey + "=...\n\nor --key <token>")
+		return nil, errors.New("no access key. Run `kamu login`, or export " + EnvAccessKey + "=... or pass --key <token>")
 	}
 	return kamustatus.New(os.Getenv(EnvURL), key), nil
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/client/kamusites"
 	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 	"github.com/kotisivukamu/kamucli/internal/render"
 )
@@ -68,13 +69,11 @@ func New() *cobra.Command {
 // resolveKey pulls the access key from --key or the env, with the same guidance
 // the create wizard gives. Shared by list/delete.
 func resolveKey(key string) (string, error) {
-	if key == "" {
-		key = os.Getenv(envKey)
+	k := config.ResolveAccessKey(key)
+	if k == "" {
+		return "", errors.New("no access key. Run `kamu login`, or export " + envKey + "=... or pass --key <token>")
 	}
-	if key == "" {
-		return "", errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and pass it:\n\n    export " + envKey + "=...\n\nor --key <token>")
-	}
-	return key, nil
+	return k, nil
 }
 
 func newList() *cobra.Command {

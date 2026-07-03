@@ -7,18 +7,25 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	ClientID     string            `yaml:"client_id,omitempty"`
-	AccessToken  string            `yaml:"access_token,omitempty"`
-	RefreshToken string            `yaml:"refresh_token,omitempty"`
-	IDToken      string            `yaml:"id_token,omitempty"`
-	ActiveOrg    string            `yaml:"active_org,omitempty"`
-	Endpoints    Endpoints         `yaml:"endpoints,omitempty"`
-	Extras       map[string]string `yaml:"extras,omitempty"`
+	ClientID     string `yaml:"client_id,omitempty"`
+	AccessToken  string `yaml:"access_token,omitempty"`
+	RefreshToken string `yaml:"refresh_token,omitempty"`
+	IDToken      string `yaml:"id_token,omitempty"`
+	// AccessKey is the kamuhub access key minted at login (kamuhub ADR 0006): the
+	// credential products + git actually accept. The KamuID tokens above only
+	// authenticate to kamuhub to mint/re-mint this. AccessKeyExpiresAt is when it
+	// lapses (zero = permanent) — kept so `kamu login` can be re-run before then.
+	AccessKey          string            `yaml:"access_key,omitempty"`
+	AccessKeyExpiresAt time.Time         `yaml:"access_key_expires_at,omitempty"`
+	ActiveOrg          string            `yaml:"active_org,omitempty"`
+	Endpoints          Endpoints         `yaml:"endpoints,omitempty"`
+	Extras             map[string]string `yaml:"extras,omitempty"`
 }
 
 const (
@@ -26,7 +33,47 @@ const (
 	EnvIssuer       = "KAMU_ISSUER"
 	EnvClientID     = "KAMU_CLIENT_ID"
 	EnvAccessToken  = "KAMU_ACCESS_TOKEN"
+	EnvAccessKey    = "KAMU_ACCESS_KEY"
+	EnvKamuhub      = "KAMU_KAMUHUB_URL"
+
+	// DefaultKamuhubBase is the front door (BFF) the CLI mints its access key at.
+	DefaultKamuhubBase = "https://app.kamuhub.com"
+	// KamuhubAudience is the RFC 8707 resource the CLI requests at login so the
+	// KamuID token is an audience-bound JWT the BFF verifies locally (ADR 0006).
+	// A stable logical identifier, matched by kamuid (validAudiences) and the BFF.
+	KamuhubAudience = "https://app.kamuhub.com"
 )
+
+// ResolveAccessKey returns the kamuhub access key to authenticate a product/git
+// call with, in precedence order: an explicit --key flag, the KAMU_ACCESS_KEY
+// env var, then the key stored by `kamu login`. Empty string when none is set.
+func ResolveAccessKey(flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if v := os.Getenv(EnvAccessKey); v != "" {
+		return v
+	}
+	if c, err := Load(); err == nil {
+		return c.AccessKey
+	}
+	return ""
+}
+
+// ResolveKamuhubBase returns the kamuhub front-door (BFF) base URL: env, config,
+// or the default. Trailing slash trimmed.
+func (c *Config) ResolveKamuhubBase() string {
+	base := DefaultKamuhubBase
+	if v := os.Getenv(EnvKamuhub); v != "" {
+		base = v
+	} else if c.Endpoints.Kamuhub != "" {
+		base = c.Endpoints.Kamuhub
+	}
+	for len(base) > 0 && base[len(base)-1] == '/' {
+		base = base[:len(base)-1]
+	}
+	return base
+}
 
 // ResolveIssuer returns the kamuid issuer URL from env, config, or default.
 func (c *Config) ResolveIssuer() string {
@@ -52,6 +99,7 @@ func (c *Config) ResolveClientID() string {
 
 type Endpoints struct {
 	Kamuid     string `yaml:"kamuid,omitempty"`
+	Kamuhub    string `yaml:"kamuhub,omitempty"`
 	Kamudb     string `yaml:"kamudb,omitempty"`
 	Kamubee    string `yaml:"kamubee,omitempty"`
 	Kamudns    string `yaml:"kamudns,omitempty"`

@@ -7,6 +7,7 @@ import (
 	"github.com/cli/browser"
 	"github.com/spf13/cobra"
 
+	"github.com/kotisivukamu/kamucli/internal/client/kamuhub"
 	"github.com/kotisivukamu/kamucli/internal/client/kamuid"
 	"github.com/kotisivukamu/kamucli/internal/command"
 	"github.com/kotisivukamu/kamucli/internal/config"
@@ -20,14 +21,20 @@ const defaultScope = "openid profile email offline_access organizations"
 
 type loginFlags struct {
 	scope     string
+	org       string
 	noBrowser bool
 }
 
+// NewLogin exposes the login command so root can also mount it top-level as
+// `kamu login` alongside `kamu auth login`.
+func NewLogin() *cobra.Command { return newLogin() }
+
 func newLogin() *cobra.Command {
 	var f loginFlags
-	cmd := command.New("login", "Log in to kamuid via the device authorization flow", "",
+	cmd := command.New("login", "Log in: device flow against kamuid, then mint a kamuhub access key", "",
 		func(ctx context.Context, _ []string) error { return runLogin(ctx, &f) })
 	cmd.Flags().StringVar(&f.scope, "scope", defaultScope, "OAuth scopes to request")
+	cmd.Flags().StringVar(&f.org, "org", "", "Organization to scope the access key to (default: your first org)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "Don't open the verification URL in a browser")
 	return cmd
 }
@@ -59,7 +66,9 @@ func runLogin(ctx context.Context, f *loginFlags) error {
 	}
 	fmt.Fprintln(io.ErrOut, "Waiting for approval...")
 
-	ts, err := client.PollDeviceToken(ctx, clientID, da)
+	// Request the kamuhub audience so the access token comes back as an
+	// audience-bound JWT the BFF can verify locally when we mint the access key.
+	ts, err := client.PollDeviceToken(ctx, clientID, config.KamuhubAudience, da)
 	if err != nil {
 		return fmt.Errorf("device token: %w", err)
 	}
@@ -84,6 +93,31 @@ func runLogin(ctx context.Context, f *loginFlags) error {
 			identity = claims.Subject
 		}
 	}
-	fmt.Fprintf(io.ErrOut, "Logged in as %s\n", identity)
+	fmt.Fprintf(io.ErrOut, "Logged in to kamuid as %s\n", identity)
+
+	// Exchange the KamuID token for a kamuhub access key — the credential products
+	// and git actually accept (ADR 0006). The raw KamuID token never leaves here.
+	kh := kamuhub.New(cfg.ResolveKamuhubBase())
+	res, err := kh.Login(ctx, ts.AccessToken, kamuhub.LoginRequest{Org: f.org, Label: "kamu CLI login"})
+	if err != nil {
+		return fmt.Errorf("mint access key: %w\n\nkamuid login succeeded but the kamuhub key mint failed; retry `kamu login`", err)
+	}
+
+	cfg.AccessKey = res.Token
+	cfg.AccessKeyExpiresAt = res.ExpiresAt()
+	if cfg.ActiveOrg == "" {
+		cfg.ActiveOrg = res.Org.Slug
+	}
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("save access key: %w", err)
+	}
+
+	expiry := "never"
+	if !res.ExpiresAt().IsZero() {
+		expiry = res.ExpiresAt().Local().Format("2006-01-02 15:04")
+	}
+	fmt.Fprintf(io.ErrOut, "Access key stored for org %q (%d capabilities; expires %s).\n",
+		res.Org.Slug, len(res.Org.Grants), expiry)
+	fmt.Fprintln(io.ErrOut, "You can now `kamu clone`, and product commands work without KAMU_ACCESS_KEY.")
 	return nil
 }

@@ -73,8 +73,11 @@ func (c *Client) StartDeviceAuth(ctx context.Context, clientID, scope string) (*
 
 // PollDeviceToken polls the token endpoint at the device-auth's `interval`
 // (bumped by 5s on `slow_down`) until tokens arrive, the user denies, the
-// device_code expires, or ctx is cancelled.
-func (c *Client) PollDeviceToken(ctx context.Context, clientID string, da *DeviceAuth) (*TokenSet, error) {
+// device_code expires, or ctx is cancelled. `resource` (RFC 8707) is forwarded
+// to the token request: pass the kamuhub audience so the access token comes back
+// as an audience-bound JWT the BFF can verify locally (kamuhub ADR 0006); "" for
+// the default opaque token.
+func (c *Client) PollDeviceToken(ctx context.Context, clientID, resource string, da *DeviceAuth) (*TokenSet, error) {
 	disco, err := c.Discovery(ctx)
 	if err != nil {
 		return nil, err
@@ -94,7 +97,7 @@ func (c *Client) PollDeviceToken(ctx context.Context, clientID string, da *Devic
 			return nil, &OAuthError{Code: "expired_token", Description: "device_code expired before approval"}
 		}
 
-		ts, err := c.exchangeDeviceCode(ctx, disco.TokenEndpoint, clientID, da.DeviceCode)
+		ts, err := c.exchangeDeviceCode(ctx, disco.TokenEndpoint, clientID, resource, da.DeviceCode)
 		if err == nil {
 			return ts, nil
 		}
@@ -110,11 +113,14 @@ func (c *Client) PollDeviceToken(ctx context.Context, clientID string, da *Devic
 	}
 }
 
-func (c *Client) exchangeDeviceCode(ctx context.Context, tokenEndpoint, clientID, deviceCode string) (*TokenSet, error) {
+func (c *Client) exchangeDeviceCode(ctx context.Context, tokenEndpoint, clientID, resource, deviceCode string) (*TokenSet, error) {
 	form := url.Values{}
 	form.Set("grant_type", DeviceCodeGrantType)
 	form.Set("device_code", deviceCode)
 	form.Set("client_id", clientID)
+	if resource != "" {
+		form.Set("resource", resource)
+	}
 
 	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {

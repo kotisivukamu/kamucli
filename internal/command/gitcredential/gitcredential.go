@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -26,6 +25,7 @@ import (
 
 	"github.com/kotisivukamu/kamucli/internal/client/forge"
 	"github.com/kotisivukamu/kamucli/internal/command"
+	"github.com/kotisivukamu/kamucli/internal/config"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
@@ -79,9 +79,9 @@ func get(ctx context.Context, io *iostreams.IOStreams, attrs map[string]string) 
 	if !hostMatches(attrs, forge.BaseURL()) {
 		return nil
 	}
-	key := os.Getenv(envKey)
+	key := config.ResolveAccessKey("")
 	if key == "" {
-		return errors.New("no access key. Create one in the dashboard (Manage -> Access keys) and export " + envKey + "=...")
+		return errors.New("no access key. Run `kamu login` (or export " + envKey + "=...)")
 	}
 	fmt.Fprintln(io.Out, "username=kamu") // cosmetic; the forge reads only the password
 	fmt.Fprintf(io.Out, "password=%s\n", key)
