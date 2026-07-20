@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -21,11 +22,19 @@ type Config struct {
 	// credential products + git actually accept. The KamuID tokens above only
 	// authenticate to kamuhub to mint/re-mint this. AccessKeyExpiresAt is when it
 	// lapses (zero = permanent) — kept so `kamu login` can be re-run before then.
-	AccessKey          string            `yaml:"access_key,omitempty"`
-	AccessKeyExpiresAt time.Time         `yaml:"access_key_expires_at,omitempty"`
-	ActiveOrg          string            `yaml:"active_org,omitempty"`
-	Endpoints          Endpoints         `yaml:"endpoints,omitempty"`
-	Extras             map[string]string `yaml:"extras,omitempty"`
+	AccessKey          string    `yaml:"access_key,omitempty"`
+	AccessKeyExpiresAt time.Time `yaml:"access_key_expires_at,omitempty"`
+	// RPAPIToken is a KamuID access token audience-bound to kamuid's own /v1/rp
+	// resource server (org management: `kamu orgs ...`). Minted transparently via
+	// the refresh-token grant with `resource` = ResolveRPAPIAudience(); cached
+	// here until RPAPITokenExpiresAt so every org command doesn't hit the token
+	// endpoint. Distinct from AccessKey: org commands authenticate as the USER
+	// against kamuid, never with the kamuhub access key.
+	RPAPIToken          string            `yaml:"rp_api_token,omitempty"`
+	RPAPITokenExpiresAt time.Time         `yaml:"rp_api_token_expires_at,omitempty"`
+	ActiveOrg           string            `yaml:"active_org,omitempty"`
+	Endpoints           Endpoints         `yaml:"endpoints,omitempty"`
+	Extras              map[string]string `yaml:"extras,omitempty"`
 }
 
 const (
@@ -42,7 +51,24 @@ const (
 	// KamuID token is an audience-bound JWT the BFF verifies locally (ADR 0006).
 	// A stable logical identifier, matched by kamuid (validAudiences) and the BFF.
 	KamuhubAudience = "https://app.kamuhub.com"
+
+	// DefaultScopes is the scope set `kamu login` requests in the device flow.
+	// kamuid's discovery doesn't advertise `organizations` or the kamu.org.*
+	// scopes, but the server honors them (they're in the oauth-provider `scopes`
+	// list) — request them explicitly. kamu.org.profile.read + kamu.org.manage
+	// gate kamuid's /v1/rp organization endpoints (`kamu orgs ...`); they must be
+	// consented at login because a refresh grant can only re-issue same-or-
+	// narrower scopes than the original grant.
+	DefaultScopes = "openid profile email offline_access organizations kamu.org.profile.read kamu.org.manage"
 )
+
+// ResolveRPAPIAudience returns the RFC 8707 resource indicator for kamuid's own
+// /v1/rp resource server. kamuid derives it from the issuer (RP_API_AUDIENCE =
+// `${ISSUER_URL}/api/v1/rp` in kamuid api/src/config/auth.ts), so mirror that:
+// stable across environments, and it happens to equal the API's public base.
+func (c *Config) ResolveRPAPIAudience() string {
+	return strings.TrimRight(c.ResolveIssuer(), "/") + "/api/v1/rp"
+}
 
 // ResolveAccessKey returns the kamuhub access key to authenticate a product/git
 // call with, in precedence order: an explicit --key flag, the KAMU_ACCESS_KEY

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kotisivukamu/kamucli/internal/client/kamuid"
 	"github.com/kotisivukamu/kamucli/internal/config"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 	"github.com/kotisivukamu/kamucli/internal/picker"
@@ -18,20 +17,17 @@ func runPicker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if cfg.IDToken == "" {
-		return errors.New(`not logged in — run "kamu auth login"`)
-	}
-	claims, err := kamuid.ParseIDTokenClaims(cfg.IDToken)
+	orgs, err := loadOrgs(ctx, io, cfg)
 	if err != nil {
-		return fmt.Errorf("parse id_token: %w", err)
+		return err
 	}
-	if len(claims.Organizations) == 0 {
-		fmt.Fprintln(io.ErrOut, "No organizations on this token.")
+	if len(orgs) == 0 {
+		fmt.Fprintln(io.ErrOut, "No organizations.")
 		return nil
 	}
 
-	opts := make([]picker.Option[string], 0, len(claims.Organizations))
-	for _, o := range claims.Organizations {
+	opts := make([]picker.Option[string], 0, len(orgs))
+	for _, o := range orgs {
 		label := fmt.Sprintf("%s — %s", o.Slug, o.Name)
 		if o.Slug == cfg.ActiveOrg {
 			label += "  •  current"
@@ -64,7 +60,7 @@ func runPicker(ctx context.Context) error {
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
-	for _, o := range claims.Organizations {
+	for _, o := range orgs {
 		if o.Slug == picked {
 			fmt.Fprintf(io.ErrOut, "Active organization set to %s (%s).\n", o.Slug, o.Name)
 			return nil

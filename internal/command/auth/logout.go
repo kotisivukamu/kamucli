@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -25,6 +26,8 @@ func newLogout() *cobra.Command {
 		cfg.AccessToken = ""
 		cfg.RefreshToken = ""
 		cfg.IDToken = ""
+		cfg.RPAPIToken = ""
+		cfg.RPAPITokenExpiresAt = time.Time{}
 		cfg.ActiveOrg = ""
 		if err := config.Save(cfg); err != nil {
 			return fmt.Errorf("save config: %w", err)

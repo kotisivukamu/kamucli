@@ -2,7 +2,6 @@ package orgs
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -16,18 +15,16 @@ import (
 
 func newList() *cobra.Command {
 	var asJSON bool
-	cmd := command.New("list", "List organizations on the current token", "", func(ctx context.Context, _ []string) error {
+	cmd := command.New("list", "List your organizations", "", func(ctx context.Context, _ []string) error {
 		io := iostreams.FromContext(ctx)
 		cfg, err := config.Load()
 		if err != nil {
 			return err
 		}
-		if cfg.IDToken == "" {
-			return errors.New(`not logged in — run "kamu auth login"`)
-		}
-		claims, err := kamuid.ParseIDTokenClaims(cfg.IDToken)
+
+		orgs, err := loadOrgs(ctx, io, cfg)
 		if err != nil {
-			return fmt.Errorf("parse id_token: %w", err)
+			return err
 		}
 
 		if asJSON {
@@ -35,20 +32,20 @@ func newList() *cobra.Command {
 				kamuid.Organization
 				Active bool `json:"active"`
 			}
-			out := make([]entry, len(claims.Organizations))
-			for i, o := range claims.Organizations {
+			out := make([]entry, len(orgs))
+			for i, o := range orgs {
 				out[i] = entry{Organization: o, Active: o.Slug == cfg.ActiveOrg}
 			}
 			return render.JSON(io.Out, out)
 		}
 
-		if len(claims.Organizations) == 0 {
-			fmt.Fprintln(io.ErrOut, "No organizations on this token.")
+		if len(orgs) == 0 {
+			fmt.Fprintln(io.ErrOut, "No organizations.")
 			return nil
 		}
 
-		rows := make([][]string, 0, len(claims.Organizations))
-		for _, o := range claims.Organizations {
+		rows := make([][]string, 0, len(orgs))
+		for _, o := range orgs {
 			active := ""
 			if o.Slug == cfg.ActiveOrg {
 				active = "*"

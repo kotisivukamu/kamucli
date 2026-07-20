@@ -2,24 +2,20 @@ package orgs
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/kotisivukamu/kamucli/internal/client/kamuid"
 	"github.com/kotisivukamu/kamucli/internal/command"
 	"github.com/kotisivukamu/kamucli/internal/config"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
 func newSwitch() *cobra.Command {
-	cmd := command.New("switch", "Switch the active organization", "",
+	cmd := command.New("switch <slug>", "Switch the active organization", "",
 		func(ctx context.Context, args []string) error { return runSwitch(ctx, args) })
 	cmd.Args = cobra.ExactArgs(1)
-	cmd.Use = "switch <slug>"
 	return cmd
 }
 
@@ -31,28 +27,17 @@ func runSwitch(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if cfg.IDToken == "" {
-		return errors.New(`not logged in — run "kamu auth login"`)
-	}
-	claims, err := kamuid.ParseIDTokenClaims(cfg.IDToken)
+	orgs, err := loadOrgs(ctx, io, cfg)
 	if err != nil {
-		return fmt.Errorf("parse id_token: %w", err)
+		return err
+	}
+	if len(orgs) == 0 {
+		return fmt.Errorf("you are not a member of any organization")
 	}
 
-	var match *kamuid.Organization
-	slugs := make([]string, 0, len(claims.Organizations))
-	for i, o := range claims.Organizations {
-		slugs = append(slugs, o.Slug)
-		if o.Slug == target {
-			match = &claims.Organizations[i]
-		}
-	}
+	match := matchOrg(orgs, target)
 	if match == nil {
-		sort.Strings(slugs)
-		if len(slugs) == 0 {
-			return fmt.Errorf("no organizations on this token")
-		}
-		return fmt.Errorf("org %q not on this token; available: %s", target, strings.Join(slugs, ", "))
+		return fmt.Errorf("no organization matches %q; available: %s", target, strings.Join(slugs(orgs), ", "))
 	}
 
 	if cfg.ActiveOrg == match.Slug {
