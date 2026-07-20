@@ -13,8 +13,8 @@ type IOStreams struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
-	isStdoutTTY bool
-	isStderrTTY bool
+	isStdoutTTY  bool
+	isStderrTTY  bool
 	colorEnabled bool
 }
 

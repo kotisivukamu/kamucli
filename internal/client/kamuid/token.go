@@ -26,16 +26,41 @@ func (t *TokenSet) AccessExpiresAt() time.Time {
 	return time.Now().Add(time.Duration(t.ExpiresIn) * time.Second)
 }
 
-// Refresh exchanges a refresh token for a new TokenSet.
-func (c *Client) Refresh(ctx context.Context, clientID, refreshToken string) (*TokenSet, error) {
+// RefreshRequest parameterizes the refresh-token grant.
+type RefreshRequest struct {
+	ClientID     string
+	RefreshToken string
+	// Scope, when set, must be the same or a NARROWER set than the original
+	// grant, or kamuid rejects with `invalid_scope` ("unable to issue scope X").
+	// Careful: kamuid rotates the refresh token on every refresh and the rotated
+	// token carries exactly the scopes requested here — narrowing permanently
+	// narrows the stored grant. Empty = keep the original scope set.
+	Scope string
+	// Resource is an RFC 8707 resource indicator: when set (and valid per
+	// kamuid's validAudiences) the access token comes back as an audience-bound
+	// JWT instead of an opaque token.
+	Resource string
+}
+
+// Refresh runs the refresh-token grant and returns the new TokenSet. The
+// response's RefreshToken is a ROTATED replacement (the presented one is
+// revoked server-side, and reusing it kills the whole token family) — callers
+// must persist it.
+func (c *Client) Refresh(ctx context.Context, r RefreshRequest) (*TokenSet, error) {
 	disco, err := c.Discovery(ctx)
 	if err != nil {
 		return nil, err
 	}
 	form := url.Values{}
 	form.Set("grant_type", "refresh_token")
-	form.Set("refresh_token", refreshToken)
-	form.Set("client_id", clientID)
+	form.Set("refresh_token", r.RefreshToken)
+	form.Set("client_id", r.ClientID)
+	if r.Scope != "" {
+		form.Set("scope", r.Scope)
+	}
+	if r.Resource != "" {
+		form.Set("resource", r.Resource)
+	}
 
 	req, err := http.NewRequest(http.MethodPost, disco.TokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -70,16 +95,16 @@ type Organization struct {
 
 // IDTokenClaims are the subset of OIDC claims kamu-cli reads.
 type IDTokenClaims struct {
-	Issuer        string         `json:"iss"`
-	Subject       string         `json:"sub"`
+	Issuer        string          `json:"iss"`
+	Subject       string          `json:"sub"`
 	Audience      json.RawMessage `json:"aud"`
-	ExpiresAt     int64          `json:"exp"`
-	IssuedAt      int64          `json:"iat"`
-	Email         string         `json:"email,omitempty"`
-	EmailVerified bool           `json:"email_verified,omitempty"`
-	Name          string         `json:"name,omitempty"`
-	Picture       string         `json:"picture,omitempty"`
-	Organizations []Organization `json:"organizations,omitempty"`
+	ExpiresAt     int64           `json:"exp"`
+	IssuedAt      int64           `json:"iat"`
+	Email         string          `json:"email,omitempty"`
+	EmailVerified bool            `json:"email_verified,omitempty"`
+	Name          string          `json:"name,omitempty"`
+	Picture       string          `json:"picture,omitempty"`
+	Organizations []Organization  `json:"organizations,omitempty"`
 }
 
 // ParseIDTokenClaims decodes the JWT payload WITHOUT verifying the signature.

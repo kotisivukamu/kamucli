@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cli/browser"
 	"github.com/spf13/cobra"
@@ -14,10 +15,13 @@ import (
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 )
 
-// kamuid prod discovery doesn't list "organizations" in scopes_supported,
-// but the server still honors it and emits the claim. We need it for M2
-// (`kamu orgs ...`) and whoami's org count, so request it explicitly.
-const defaultScope = "openid profile email offline_access organizations"
+// kamuid prod discovery doesn't list "organizations" or the kamu.org.* scopes
+// in scopes_supported, but the server still honors them. `organizations` feeds
+// the id_token claim (`kamu orgs`, whoami's org count); kamu.org.profile.read +
+// kamu.org.manage gate the /v1/rp org endpoints (`kamu orgs create/show/...`)
+// and must be consented HERE — a refresh grant can only re-issue scopes the
+// original grant carried, so logins predating them need a re-login.
+const defaultScope = config.DefaultScopes
 
 type loginFlags struct {
 	scope     string
@@ -78,6 +82,10 @@ func runLogin(ctx context.Context, f *loginFlags) error {
 	cfg.AccessToken = ts.AccessToken
 	cfg.RefreshToken = ts.RefreshToken
 	cfg.IDToken = ts.IDToken
+	// Any cached RP-API token belongs to the previous session; drop it so
+	// `kamu orgs` re-mints from the fresh refresh token.
+	cfg.RPAPIToken = ""
+	cfg.RPAPITokenExpiresAt = time.Time{}
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
