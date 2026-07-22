@@ -3,6 +3,7 @@ package root
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/kotisivukamu/kamucli/internal/command/assets"
 	"github.com/kotisivukamu/kamucli/internal/command/auth"
 	"github.com/kotisivukamu/kamucli/internal/command/bee"
 	"github.com/kotisivukamu/kamucli/internal/command/clone"
@@ -44,6 +45,7 @@ func New(bi BuildInfo) *cobra.Command {
 
 	add(clone.New(), "platform")
 	add(sites.New(), "platform")
+	add(assets.New(), "platform")
 	add(db.New(), "platform")
 	add(bee.New(), "platform")
 	add(dns.New(), "platform")
