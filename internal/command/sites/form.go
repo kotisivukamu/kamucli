@@ -30,6 +30,7 @@ func newForm() *cobra.Command {
 	cmd := command.New("form", "Manage a site's relay form destinations", "", nil)
 	cmd.AddCommand(newFormAdd())
 	cmd.AddCommand(newFormList())
+	cmd.AddCommand(newFormGet())
 	cmd.AddCommand(newFormRemove())
 	return cmd
 }
@@ -173,6 +174,76 @@ func newFormList() *cobra.Command {
 		}
 		return render.Table(io.Out, []string{"SCOPE", "ID", "TARGET", "LABEL", "PATH", "SECRET"}, rows)
 	})
+	f := cmd.Flags()
+	f.StringVar(&key, "key", "", "kamuhub access key (or "+envKey+")")
+	f.StringVar(&site, "site", "", "site id or slug (required)")
+	f.BoolVar(&asJSON, "json", false, "Output JSON")
+	return cmd
+}
+
+func newFormGet() *cobra.Command {
+	var (
+		key, site string
+		asJSON    bool
+	)
+	cmd := command.New("get", "Show one destination and its delivery stats", "", func(ctx context.Context, args []string) error {
+		if ctx == nil {
+			ctx = context.TODO()
+		}
+		io := iostreams.FromContext(ctx)
+		k, err := resolveKey(key)
+		if err != nil {
+			return err
+		}
+		client := kamusites.New(os.Getenv(envURL), k)
+		s, err := resolveSite(ctx, client, site)
+		if err != nil {
+			return err
+		}
+
+		detail, err := client.GetDestination(ctx, s.ID, args[0])
+		if err != nil {
+			return explainDestErr(err)
+		}
+		if asJSON {
+			return render.JSON(io.Out, detail)
+		}
+
+		d := detail.Destination
+		scope := "org"
+		if d.Wired {
+			scope = "site"
+		}
+		fmt.Fprintf(io.Out, "%s (%s)\n", d.ID, scope)
+		fmt.Fprintf(io.Out, "  target:   %s\n", d.TargetURL)
+		if d.Label != "" {
+			fmt.Fprintf(io.Out, "  label:    %s\n", d.Label)
+		}
+		fmt.Fprintf(io.Out, "  path:     %s\n", d.Path)
+		if s.Domain != "" {
+			fmt.Fprintf(io.Out, "  url:      https://%s%s\n", s.Domain, d.Path)
+		}
+		fmt.Fprintf(io.Out, "  enabled:  %t\n", d.Enabled)
+		secret := "no"
+		if d.HasSecret {
+			secret = "yes (delivered as X-Kamu-Relay-Key)"
+		}
+		fmt.Fprintf(io.Out, "  secret:   %s\n", secret)
+
+		if st := detail.Stats; st != nil {
+			fmt.Fprintln(io.Out, "  delivery:")
+			fmt.Fprintf(io.Out, "    delivered: %d\n", st.Delivered)
+			fmt.Fprintf(io.Out, "    failed:    %d\n", st.Failed)
+			fmt.Fprintf(io.Out, "    pending:   %d\n", st.Pending)
+			if st.LastAttemptAt != "" {
+				fmt.Fprintf(io.Out, "    last:      HTTP %d at %s\n", st.LastStatus, st.LastAttemptAt)
+			} else {
+				fmt.Fprintln(io.Out, "    last:      no attempts yet")
+			}
+		}
+		return nil
+	})
+	cmd.Args = cobra.ExactArgs(1)
 	f := cmd.Flags()
 	f.StringVar(&key, "key", "", "kamuhub access key (or "+envKey+")")
 	f.StringVar(&site, "site", "", "site id or slug (required)")
