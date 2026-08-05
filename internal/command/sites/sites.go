@@ -63,6 +63,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(newCreate())
 	cmd.AddCommand(newList())
 	cmd.AddCommand(newDelete())
+	cmd.AddCommand(newForm())
 	return cmd
 }
 

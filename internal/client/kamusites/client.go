@@ -241,6 +241,92 @@ func (c *Client) GenerateLogo(ctx context.Context, siteID, prompt string) (strin
 	return r.Filename, err
 }
 
+// Destination is a KamuCDN relay destination as the site-scoped API returns it:
+// the org-wide relay record (secret stripped to has_secret) annotated with
+// `Wired` — whether THIS site has a link to it. `Path` is the public ingest path
+// (/k/amu/relay/<id>) a live site POSTs JSON to on its own domain.
+type Destination struct {
+	ID           string `json:"id"`
+	TargetURL    string `json:"target_url"`
+	Label        string `json:"label"`
+	Enabled      bool   `json:"enabled"`
+	MaxBodyBytes int    `json:"max_body_bytes"`
+	RatePerHour  int    `json:"rate_per_hour"`
+	CreatedAt    string `json:"created_at"`
+	Path         string `json:"path"`
+	HasSecret    bool   `json:"has_secret"`
+	Wired        bool   `json:"wired"`
+}
+
+// DeliveryStats is the relay's per-destination rolling delivery summary (kamucdn
+// relay/db.go DeliveryStats), returned under `stats` on the GET-one route.
+type DeliveryStats struct {
+	Delivered     int64  `json:"delivered"`
+	Failed        int64  `json:"failed"`
+	Pending       int64  `json:"pending"`
+	LastStatus    int    `json:"last_status"`
+	LastAttemptAt string `json:"last_attempt_at"`
+}
+
+// CreateDestinationInput is the body POST /sites/:id/destinations accepts.
+// TargetURL is required; the relay validates it (SSRF) and 400s a rejected one.
+// The zero-valued optional numerics are omitted so the relay applies its
+// defaults. `kind` is left to the server default ('form') — this client only
+// creates form destinations.
+type CreateDestinationInput struct {
+	TargetURL    string `json:"target_url"`
+	Label        string `json:"label,omitempty"`
+	Secret       string `json:"secret,omitempty"`
+	MaxBodyBytes int    `json:"max_body_bytes,omitempty"`
+	RatePerHour  int    `json:"rate_per_hour,omitempty"`
+}
+
+// Destinations lists the org's relay destinations, each flagged with Wired for
+// this site (wired ones first). RLS scopes the site; a foreign/unknown id 404s.
+func (c *Client) Destinations(ctx context.Context, siteID string) ([]Destination, error) {
+	var r struct {
+		Destinations []Destination `json:"destinations"`
+	}
+	return r.Destinations, c.do(ctx, "GET", "/sites/"+siteID+"/destinations", nil, &r)
+}
+
+// CreateDestination registers a relay destination AND wires it to the site in one
+// call. Returns the record with its public ingest path.
+func (c *Client) CreateDestination(ctx context.Context, siteID string, in CreateDestinationInput) (*Destination, error) {
+	var r struct {
+		Destination Destination `json:"destination"`
+	}
+	if err := c.do(ctx, "POST", "/sites/"+siteID+"/destinations", in, &r); err != nil {
+		return nil, err
+	}
+	return &r.Destination, nil
+}
+
+// DestinationDetail is the GET-one response: the destination (annotated with
+// Wired for the site) plus its relay delivery stats. Stats is a pointer because
+// the route returns null when the relay reports none.
+type DestinationDetail struct {
+	Destination Destination    `json:"destination"`
+	Stats       *DeliveryStats `json:"stats"`
+}
+
+// GetDestination fetches one of the site's destinations with its delivery stats.
+// 404 when the id isn't the site's org's (RLS/ownership gate).
+func (c *Client) GetDestination(ctx context.Context, siteID, destinationID string) (*DestinationDetail, error) {
+	var r DestinationDetail
+	if err := c.do(ctx, "GET", "/sites/"+siteID+"/destinations/"+destinationID, nil, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// DeleteDestination removes a destination from the site: it deletes the relay
+// record and unwires it. 404 when the id isn't the site's org's, or is wired only
+// to another site.
+func (c *Client) DeleteDestination(ctx context.Context, siteID, destinationID string) error {
+	return c.do(ctx, "DELETE", "/sites/"+siteID+"/destinations/"+destinationID, nil, nil)
+}
+
 func (c *Client) LatestBuild(ctx context.Context, siteID string) (*Build, error) {
 	var r struct {
 		Builds []Build `json:"builds"`
