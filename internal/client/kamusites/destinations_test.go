@@ -82,6 +82,51 @@ func TestCreateDestinationBodyAndRoute(t *testing.T) {
 	}
 }
 
+func TestGetDestinationRouteAndParse(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotMethod = r.URL.Path, r.Method
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"destination": map[string]any{"id": "d1", "target_url": "https://a", "path": "/k/amu/relay/d1", "wired": true},
+			"stats":       map[string]any{"delivered": 5, "failed": 1, "pending": 2, "last_status": 200, "last_attempt_at": "2026-08-05T00:00:00Z"},
+		})
+	}))
+	defer srv.Close()
+
+	detail, err := New(srv.URL, "k").GetDestination(context.Background(), "site-1", "d1")
+	if err != nil {
+		t.Fatalf("GetDestination: %v", err)
+	}
+	if gotMethod != http.MethodGet || gotPath != "/api/sites/site-1/destinations/d1" {
+		t.Errorf("hit %s %s, want GET /api/sites/site-1/destinations/d1", gotMethod, gotPath)
+	}
+	if !detail.Destination.Wired || detail.Destination.ID != "d1" {
+		t.Errorf("destination = %+v", detail.Destination)
+	}
+	if detail.Stats == nil || detail.Stats.Delivered != 5 || detail.Stats.Failed != 1 ||
+		detail.Stats.Pending != 2 || detail.Stats.LastStatus != 200 || detail.Stats.LastAttemptAt != "2026-08-05T00:00:00Z" {
+		t.Errorf("stats = %+v", detail.Stats)
+	}
+}
+
+func TestGetDestinationNullStats(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"destination": map[string]any{"id": "d1", "wired": false},
+			"stats":       nil,
+		})
+	}))
+	defer srv.Close()
+
+	detail, err := New(srv.URL, "k").GetDestination(context.Background(), "s", "d1")
+	if err != nil {
+		t.Fatalf("GetDestination: %v", err)
+	}
+	if detail.Stats != nil {
+		t.Errorf("stats = %+v, want nil", detail.Stats)
+	}
+}
+
 func TestDeleteDestinationRoute(t *testing.T) {
 	var gotPath, gotMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

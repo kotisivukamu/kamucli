@@ -258,6 +258,16 @@ type Destination struct {
 	Wired        bool   `json:"wired"`
 }
 
+// DeliveryStats is the relay's per-destination rolling delivery summary (kamucdn
+// relay/db.go DeliveryStats), returned under `stats` on the GET-one route.
+type DeliveryStats struct {
+	Delivered     int64  `json:"delivered"`
+	Failed        int64  `json:"failed"`
+	Pending       int64  `json:"pending"`
+	LastStatus    int    `json:"last_status"`
+	LastAttemptAt string `json:"last_attempt_at"`
+}
+
 // CreateDestinationInput is the body POST /sites/:id/destinations accepts.
 // TargetURL is required; the relay validates it (SSRF) and 400s a rejected one.
 // The zero-valued optional numerics are omitted so the relay applies its
@@ -290,6 +300,24 @@ func (c *Client) CreateDestination(ctx context.Context, siteID string, in Create
 		return nil, err
 	}
 	return &r.Destination, nil
+}
+
+// DestinationDetail is the GET-one response: the destination (annotated with
+// Wired for the site) plus its relay delivery stats. Stats is a pointer because
+// the route returns null when the relay reports none.
+type DestinationDetail struct {
+	Destination Destination    `json:"destination"`
+	Stats       *DeliveryStats `json:"stats"`
+}
+
+// GetDestination fetches one of the site's destinations with its delivery stats.
+// 404 when the id isn't the site's org's (RLS/ownership gate).
+func (c *Client) GetDestination(ctx context.Context, siteID, destinationID string) (*DestinationDetail, error) {
+	var r DestinationDetail
+	if err := c.do(ctx, "GET", "/sites/"+siteID+"/destinations/"+destinationID, nil, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // DeleteDestination removes a destination from the site: it deletes the relay
