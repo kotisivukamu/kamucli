@@ -61,27 +61,36 @@ release:
   # 422-ing on "asset already_exists", so a re-run of a version is idempotent.
   mode: replace
 
-# NOTE: `brews:` will rename to `homebrew_formulas:` in goreleaser v3.
-# Functionally identical; flip when we bump the runner.
-brews:
+# Homebrew CASK, not formula: goreleaser deprecated `brews:` in favour of
+# `homebrew_casks:` (v2.18 fails `goreleaser check` on it). Casks are also the
+# right shape for what we ship — a prebuilt binary, not something brew builds
+# from source.
+homebrew_casks:
   - name: kamu
-    # Publish the formula to the tap only when HOMEBREW_TAP_TOKEN is set. Without
-    # it, skip the tap push so the release still ships binaries (go install /
-    # direct download) instead of failing the whole release on a 401. Set the
-    # secret to auto-enable `brew install kotisivukamu/tap/kamu`.
+    # Publish to the tap only when HOMEBREW_TAP_TOKEN is set. Without it, skip
+    # the tap push so the release still ships binaries (go install / direct
+    # download) instead of failing the whole release on a 401. Set the secret
+    # to auto-enable `brew install kotisivukamu/tap/kamu`.
     skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
     repository:
       owner: kotisivukamu
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/kotisivukamu/kamucli"
     description: "Unified CLI for the Kamu platform — drive kamudb, kamubee, and kamudns with one auth"
-    install: |
-      bin.install "kamu"
-    test: |
-      assert_match "kamu", shell_output("#{bin}/kamu version")
+    binaries:
+      - kamu
+    # An unsigned binary downloaded by brew carries com.apple.quarantine, which
+    # makes macOS refuse to run it as "damaged" — the cask equivalent of the
+    # formula's implicit trust. Strip it at install time.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kamu"]
+          end
     commit_author:
       name: kamu-release-bot
       email: release-bot@kotisivukamu.fi
