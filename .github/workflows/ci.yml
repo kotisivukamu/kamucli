@@ -23,7 +23,6 @@ jobs:
 
   goreleaser-check:
     runs-on: ubuntu-latest
-    continue-on-error: true # `brews:` deprecation warning is informational until v3.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -31,5 +30,9 @@ jobs:
           go-version: stable
       - uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          # Pinned to the v2 line. `latest` floats across majors, so a release
+          # of goreleaser can turn this red (or change what `release` produces)
+          # on a commit that touched nothing — which is exactly how the `brews:`
+          # deprecation landed here.
+          version: "~> v2"
           args: check

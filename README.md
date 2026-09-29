@@ -16,6 +16,19 @@ kamu status projects list
 unified platform identity — the `kamu auth login` token, or a kamuhub access key
 (`export KAMU_ACCESS_KEY=...`, same as `kamu sites`). No project-scoped keys.
 
+A kamustatus project holds **properties** (one site origin each) and
+**monitors** (one check each); a monitor may belong to a property, which is what
+groups its checks with that site's error reporting:
+
+```sh
+kamu status properties add <project-id> --name "Main site" --origin https://example.com
+kamu status monitors set <monitor-id> --property <property-id>
+kamu status properties show <property-id>     # includes the browser install snippet
+```
+
+`kamu status properties set` changes a property's name or origin, and
+`kamu status monitors set` changes any setting on an existing monitor.
+
 `kamu clone <project>` clones a project's git repository over HTTPS from the
 platform forge (`git.kamuhub.com`), which hosts repos for **every** project
 type — git access is a platform capability, not a sites feature. Your kamuhub

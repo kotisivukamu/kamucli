@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/kotisivukamu/kamucli/internal/client/kamustatus"
 	"github.com/kotisivukamu/kamucli/internal/command"
 	"github.com/kotisivukamu/kamucli/internal/iostreams"
 	"github.com/kotisivukamu/kamucli/internal/render"
@@ -20,6 +21,7 @@ func newMonitors() *cobra.Command {
 		newMonitorsList(),
 		newMonitorsAdd(),
 		newMonitorsShow(),
+		newMonitorsSet(),
 		newMonitorsStats(),
 		newMonitorsToggle("enable", true),
 		newMonitorsToggle("disable", false),
@@ -309,6 +311,118 @@ func newMonitorsStats() *cobra.Command {
 	cmd.Flags().IntVar(&hours, "hours", 24, "Hours to look back")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
+}
+
+// newMonitorsSet is the general update path. enable/disable stay as their own
+// verbs because they are the common case and read better, but everything else a
+// monitor carries — including which property it belongs to — is changed here.
+func newMonitorsSet() *cobra.Command {
+	var (
+		name, target, typ, method, dnsType, bodyContains, property string
+		interval, expectedStatus, timeout, port, grace             int
+		clearProperty                                              bool
+	)
+	// Captured so the runner can ask which flags were actually given. PATCH
+	// semantics make "not passed" and "passed as zero" different requests, and
+	// a zero-value check cannot tell them apart — so `--expected-status 0` or
+	// `--body-contains ""` reach the server as real values.
+	var cmd *cobra.Command
+	cmd = command.New("set", "Change a monitor's settings", "", func(ctx context.Context, args []string) error {
+		flags := cmd.Flags()
+		updates := map[string]any{}
+		for flag, val := range map[string]any{
+			"name":            name,
+			"target":          target,
+			"type":            typ,
+			"method":          method,
+			"dns-type":        dnsType,
+			"body-contains":   bodyContains,
+			"interval":        interval,
+			"expected-status": expectedStatus,
+			"timeout":         timeout,
+			"port":            port,
+			"grace":           grace,
+		} {
+			if flags.Changed(flag) {
+				updates[monitorPatchKey(flag)] = val
+			}
+		}
+		switch {
+		case clearProperty && flags.Changed("property"):
+			return fmt.Errorf("--property and --no-property are mutually exclusive")
+		case clearProperty:
+			updates["propertyId"] = nil // explicit null unlinks
+		case flags.Changed("property"):
+			updates["propertyId"] = property
+		}
+		if len(updates) == 0 {
+			return fmt.Errorf("nothing to change: pass at least one flag (see --help)")
+		}
+
+		c, err := client()
+		if err != nil {
+			return err
+		}
+		data, err := c.UpdateMonitor(ctxOrTodo(ctx), args[0], updates)
+		if err != nil {
+			return err
+		}
+		var m kamustatus.Monitor
+		if err := json.Unmarshal(data, &m); err != nil {
+			return err
+		}
+		io := iostreams.FromContext(ctx)
+		fmt.Fprintf(io.Out, "Updated monitor %s\n", m.Name)
+		rows := [][]string{{"type", m.Type}}
+		if m.Target != "" {
+			rows = append(rows, []string{"target", m.Target})
+		}
+		if m.IntervalSeconds > 0 {
+			rows = append(rows, []string{"interval", fmt.Sprintf("%ds", m.IntervalSeconds)})
+		}
+		if m.PropertyID != "" {
+			rows = append(rows, []string{"property", m.PropertyID})
+		}
+		return render.Table(io.Out, nil, rows)
+	})
+	cmd.Args = cobra.ExactArgs(1)
+	cmd.Use = "set <monitor-id>"
+	cmd.Flags().StringVar(&name, "name", "", "Monitor name")
+	cmd.Flags().StringVar(&target, "target", "", "Target URL/hostname")
+	cmd.Flags().StringVar(&typ, "type", "", "Monitor type: http, tcp, dns, ping, heartbeat")
+	cmd.Flags().StringVar(&method, "method", "", "HTTP method")
+	cmd.Flags().IntVar(&interval, "interval", 0, "Check interval in seconds")
+	cmd.Flags().IntVar(&expectedStatus, "expected-status", 0, "Expected HTTP status code")
+	cmd.Flags().IntVar(&timeout, "timeout", 0, "Timeout in ms")
+	cmd.Flags().IntVar(&port, "port", 0, "TCP port")
+	cmd.Flags().StringVar(&dnsType, "dns-type", "", "DNS record type: A, AAAA, CNAME, MX, TXT")
+	cmd.Flags().StringVar(&bodyContains, "body-contains", "", "Expected substring in response body")
+	cmd.Flags().IntVar(&grace, "grace", 0, "Grace period before marking heartbeat down (seconds)")
+	cmd.Flags().StringVar(&property, "property", "", "Link to this property id (must belong to the monitor's project)")
+	cmd.Flags().BoolVar(&clearProperty, "no-property", false, "Unlink the monitor from its property")
+	return cmd
+}
+
+// monitorPatchKey maps a CLI flag to the JSON key kamustatus's PATCH whitelist
+// expects. They differ where the flag reads better short (--interval) than the
+// wire name (intervalSeconds).
+func monitorPatchKey(flag string) string {
+	switch flag {
+	case "interval":
+		return "intervalSeconds"
+	case "expected-status":
+		return "expectedStatus"
+	case "timeout":
+		return "timeoutMs"
+	case "dns-type":
+		return "dnsRecordType"
+	case "body-contains":
+		return "bodyContains"
+	case "grace":
+		return "graceSeconds"
+	default:
+		return flag
+	}
 }
 
 func newMonitorsToggle(verb string, enabled bool) *cobra.Command {
