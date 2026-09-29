@@ -33,6 +33,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(
 		newProjects(),
 		newMonitors(),
+		newProperties(),
 		newAlerts(),
 		newPage(),
 	)

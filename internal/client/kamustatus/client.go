@@ -135,6 +135,31 @@ type Monitor struct {
 	Enabled         bool   `json:"enabled"`
 	HeartbeatToken  string `json:"heartbeat_token,omitempty"`
 	PingURL         string `json:"pingUrl,omitempty"`
+	PropertyID      string `json:"property_id,omitempty"`
+}
+
+// Property is one site/service origin, sitting between a project and its
+// monitors. Errors (and later security/performance signals) hang off a
+// property rather than a monitor, because they are properties of a site, not
+// of a single ping target.
+type Property struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	Name      string `json:"name"`
+	Origin    string `json:"origin"`
+	// IngestKey is PUBLIC by design — a write-only credential embedded in page
+	// source (the Sentry/PostHog DSN model). It authorizes writes to this one
+	// property and grants no read capability, so printing it is not a leak.
+	// Rotate it when a snippet ends up somewhere it should not be.
+	IngestKey string `json:"ingest_key"`
+	IngestURL string `json:"ingest_url"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+
+	// Rollups the list endpoint computes; absent from single-property reads.
+	MonitorCount    int    `json:"monitor_count"`
+	OpenErrorGroups int    `json:"open_error_groups"`
+	LastErrorAt     string `json:"last_error_at,omitempty"`
 }
 
 // --- Endpoints ---
@@ -213,4 +238,60 @@ func (c *Client) DeleteAlert(ctx context.Context, id string) error {
 
 func (c *Client) GetPublicStatus(ctx context.Context, slug string) (json.RawMessage, error) {
 	return c.GetPublic(ctx, "/status/"+slug)
+}
+
+func (c *Client) ListProperties(ctx context.Context, projectID string) ([]Property, error) {
+	data, err := c.Do(ctx, "GET", "/projects/"+projectID+"/properties", nil)
+	if err != nil {
+		return nil, err
+	}
+	var out []Property
+	return out, json.Unmarshal(data, &out)
+}
+
+// CreateProperty registers an origin. The server normalizes it to scheme +
+// host (+ non-default port) and rejects anything that is not http(s), because
+// the value doubles as a uniqueness key and the ingest tier's Origin allowlist.
+func (c *Client) CreateProperty(ctx context.Context, projectID, name, origin string) (*Property, error) {
+	data, err := c.Do(ctx, "POST", "/projects/"+projectID+"/properties", map[string]string{
+		"name": name, "origin": origin,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var p Property
+	return &p, json.Unmarshal(data, &p)
+}
+
+// GetProperty returns the raw body: a single property carries `monitors` and
+// `errorGroupCounts` alongside the Property fields, which the show command
+// renders without needing a type for the whole envelope.
+func (c *Client) GetProperty(ctx context.Context, id string) (json.RawMessage, error) {
+	return c.Do(ctx, "GET", "/properties/"+id, nil)
+}
+
+func (c *Client) UpdateProperty(ctx context.Context, id string, updates map[string]any) (*Property, error) {
+	data, err := c.Do(ctx, "PATCH", "/properties/"+id, updates)
+	if err != nil {
+		return nil, err
+	}
+	var p Property
+	return &p, json.Unmarshal(data, &p)
+}
+
+func (c *Client) DeleteProperty(ctx context.Context, id string) error {
+	_, err := c.Do(ctx, "DELETE", "/properties/"+id, nil)
+	return err
+}
+
+// RotateIngestKey mints a new ingest key and invalidates the old one at once —
+// any page still serving the previous snippet stops being accepted as soon as
+// the change propagates, so the snippet has to be updated wherever it is used.
+func (c *Client) RotateIngestKey(ctx context.Context, id string) (*Property, error) {
+	data, err := c.Do(ctx, "POST", "/properties/"+id+"/rotate-ingest-key", nil)
+	if err != nil {
+		return nil, err
+	}
+	var p Property
+	return &p, json.Unmarshal(data, &p)
 }
