@@ -10,6 +10,7 @@ kamu dns zones
 kamu sites list
 kamu clone my-project
 kamu status projects list
+kamu billing invoices
 ```
 
 `kamu status` talks to **kamustatus**, a kamuhub resource server. It uses the
@@ -28,6 +29,26 @@ kamu status properties show <property-id>     # includes the browser install sni
 
 `kamu status properties set` changes a property's name or origin, and
 `kamu status monitors set` changes any setting on an existing monitor.
+
+`kamu billing` is the org's own paperwork: which rail it is on, what card is on
+file, and — the part that was previously impossible to get at — the document
+behind each line on your card statement.
+
+```sh
+kamu billing summary                       # rail, card, subscriptions, last charges
+kamu billing invoices                      # newest first; --status, --limit
+kamu billing invoice <id>                  # lines + the Stripe PDF / hosted page
+kamu billing invoice <id> -o kuitti.pdf    # download the PDF
+kamu billing charges                       # immediate collections (a domain order, a one-off)
+kamu billing charge <id>                   # + the Stripe receipt link
+```
+
+Billing is per organization and keyed on the `kamuid_org_id`, which the CLI
+reads out of your access key. Pass `--org <slug|kamuid org id>` when the key
+covers several orgs. Document URLs are Stripe's own signed links, resolved on
+demand and never stored; `-o` fetches them unauthenticated, so your access key
+never leaves the front door. An invoice on the e-invoice rail has no Stripe
+document — Procountor issues that paperwork, and `procountor_ref` names it.
 
 `kamu clone <project>` clones a project's git repository over HTTPS from the
 platform forge (`git.kamuhub.com`), which hosts repos for **every** project
