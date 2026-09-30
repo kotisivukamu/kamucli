@@ -6,6 +6,7 @@ import (
 	"github.com/kotisivukamu/kamucli/internal/command/assets"
 	"github.com/kotisivukamu/kamucli/internal/command/auth"
 	"github.com/kotisivukamu/kamucli/internal/command/bee"
+	"github.com/kotisivukamu/kamucli/internal/command/billing"
 	"github.com/kotisivukamu/kamucli/internal/command/clone"
 	"github.com/kotisivukamu/kamucli/internal/command/db"
 	"github.com/kotisivukamu/kamucli/internal/command/dns"
@@ -53,6 +54,7 @@ func New(bi BuildInfo) *cobra.Command {
 	add(auth.New(), "account")
 	add(auth.NewLogin(), "account") // top-level `kamu login` alias for `kamu auth login`
 	add(orgs.New(), "account")
+	add(billing.New(), "account")
 	add(version.New(bi.Version, bi.Commit, bi.Date), "meta")
 
 	// Hidden plumbing: the git credential helper `kamu clone` installs
