@@ -1,5 +1,5 @@
 // Package status implements `kamu status` — monitor projects, monitors, alerts,
-// and public status pages on kamustatus (https://github.com/kontakto-fi/kamustatus).
+// status pages with custom domains, and public status pages on kamustatus (https://github.com/kontakto-fi/kamustatus).
 package status
 
 import (
@@ -35,6 +35,8 @@ func New() *cobra.Command {
 		newMonitors(),
 		newProperties(),
 		newAlerts(),
+		newPages(),
+		newDomains(),
 		newPage(),
 	)
 	return cmd
