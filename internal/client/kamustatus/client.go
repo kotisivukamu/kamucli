@@ -193,13 +193,29 @@ func (c *Client) DeleteProject(ctx context.Context, id string) error {
 	return err
 }
 
+// ListMonitors returns every monitor in the project. The API paginates this
+// route ({monitors, total, limit, offset}, max 200 per page), so the client
+// walks the pages and flattens them; callers see one list.
 func (c *Client) ListMonitors(ctx context.Context, projectID string) ([]Monitor, error) {
-	data, err := c.Do(ctx, "GET", "/projects/"+projectID+"/monitors", nil)
-	if err != nil {
-		return nil, err
+	const pageSize = 200
+	var all []Monitor
+	for offset := 0; ; offset += pageSize {
+		data, err := c.Do(ctx, "GET", fmt.Sprintf("/projects/%s/monitors?limit=%d&offset=%d", projectID, pageSize, offset), nil)
+		if err != nil {
+			return nil, err
+		}
+		var page struct {
+			Monitors []Monitor `json:"monitors"`
+			Total    int       `json:"total"`
+		}
+		if err := json.Unmarshal(data, &page); err != nil {
+			return nil, err
+		}
+		all = append(all, page.Monitors...)
+		if len(page.Monitors) < pageSize || len(all) >= page.Total {
+			return all, nil
+		}
 	}
-	var out []Monitor
-	return out, json.Unmarshal(data, &out)
 }
 
 func (c *Client) CreateMonitor(ctx context.Context, projectID string, input map[string]any) (json.RawMessage, error) {
