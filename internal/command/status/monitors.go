@@ -66,8 +66,9 @@ func newMonitorsList() *cobra.Command {
 
 func newMonitorsAdd() *cobra.Command {
 	var (
-		name, target, typ, method, dnsType, bodyContains string
-		interval, expectedStatus, timeout, port, grace   int
+		name, target, typ, method, dnsType              string
+		bodyContains, bodyRegex, jsonPath, jsonExpected string
+		interval, expectedStatus, timeout, port, grace  int
 	)
 	cmd := command.New("add", "Add a monitor", "", func(ctx context.Context, args []string) error {
 		if typ != "heartbeat" && target == "" {
@@ -95,8 +96,16 @@ func newMonitorsAdd() *cobra.Command {
 		if dnsType != "" {
 			input["dnsRecordType"] = dnsType
 		}
-		if bodyContains != "" {
-			input["bodyContains"] = bodyContains
+		for key, v := range map[string]string{
+			"bodyContains": bodyContains, "bodyRegex": bodyRegex,
+			"jsonPath": jsonPath, "jsonExpected": jsonExpected,
+		} {
+			if v != "" {
+				input[key] = v
+			}
+		}
+		if jsonExpected != "" && jsonPath == "" {
+			return fmt.Errorf("--json-expected needs --json-path")
 		}
 		if grace > 0 {
 			input["graceSeconds"] = grace
@@ -144,8 +153,9 @@ func newMonitorsAdd() *cobra.Command {
 	cmd.Flags().IntVar(&timeout, "timeout", 0, "Timeout in ms")
 	cmd.Flags().IntVar(&port, "port", 0, "TCP port")
 	cmd.Flags().StringVar(&dnsType, "dns-type", "", "DNS record type: A, AAAA, CNAME, MX, TXT")
-	cmd.Flags().StringVar(&bodyContains, "body-contains", "", "Expected substring in response body")
 	cmd.Flags().IntVar(&grace, "grace", 0, "Grace period before marking heartbeat down (seconds)")
+	addAssertionFlags(cmd, &bodyContains, &bodyRegex, &jsonPath, &jsonExpected)
+	cmd.Use = "add <project-id>"
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
@@ -318,9 +328,10 @@ func newMonitorsStats() *cobra.Command {
 // monitor carries — including which property it belongs to — is changed here.
 func newMonitorsSet() *cobra.Command {
 	var (
-		name, target, typ, method, dnsType, bodyContains, property string
-		interval, expectedStatus, timeout, port, grace             int
-		clearProperty                                              bool
+		name, target, typ, method, dnsType, property    string
+		bodyContains, bodyRegex, jsonPath, jsonExpected string
+		interval, expectedStatus, timeout, port, grace  int
+		clearProperty                                   bool
 	)
 	// Captured so the runner can ask which flags were actually given. PATCH
 	// semantics make "not passed" and "passed as zero" different requests, and
@@ -337,6 +348,9 @@ func newMonitorsSet() *cobra.Command {
 			"method":          method,
 			"dns-type":        dnsType,
 			"body-contains":   bodyContains,
+			"body-regex":      bodyRegex,
+			"json-path":       jsonPath,
+			"json-expected":   jsonExpected,
 			"interval":        interval,
 			"expected-status": expectedStatus,
 			"timeout":         timeout,
@@ -387,6 +401,7 @@ func newMonitorsSet() *cobra.Command {
 	})
 	cmd.Args = cobra.ExactArgs(1)
 	cmd.Use = "set <monitor-id>"
+	cmd.Aliases = []string{"update"}
 	cmd.Flags().StringVar(&name, "name", "", "Monitor name")
 	cmd.Flags().StringVar(&target, "target", "", "Target URL/hostname")
 	cmd.Flags().StringVar(&typ, "type", "", "Monitor type: http, tcp, dns, ping, heartbeat")
@@ -396,8 +411,8 @@ func newMonitorsSet() *cobra.Command {
 	cmd.Flags().IntVar(&timeout, "timeout", 0, "Timeout in ms")
 	cmd.Flags().IntVar(&port, "port", 0, "TCP port")
 	cmd.Flags().StringVar(&dnsType, "dns-type", "", "DNS record type: A, AAAA, CNAME, MX, TXT")
-	cmd.Flags().StringVar(&bodyContains, "body-contains", "", "Expected substring in response body")
 	cmd.Flags().IntVar(&grace, "grace", 0, "Grace period before marking heartbeat down (seconds)")
+	addAssertionFlags(cmd, &bodyContains, &bodyRegex, &jsonPath, &jsonExpected)
 	cmd.Flags().StringVar(&property, "property", "", "Link to this property id (must belong to the monitor's project)")
 	cmd.Flags().BoolVar(&clearProperty, "no-property", false, "Unlink the monitor from its property")
 	return cmd
@@ -418,11 +433,27 @@ func monitorPatchKey(flag string) string {
 		return "dnsRecordType"
 	case "body-contains":
 		return "bodyContains"
+	case "body-regex":
+		return "bodyRegex"
+	case "json-path":
+		return "jsonPath"
+	case "json-expected":
+		return "jsonExpected"
 	case "grace":
 		return "graceSeconds"
 	default:
 		return flag
 	}
+}
+
+// addAssertionFlags registers the HTTP response assertions the probe checks on
+// every run, shared by `add` and `set` so the semantics are documented once.
+// The server caps each value at 1000 characters. On `set`, "" clears one.
+func addAssertionFlags(cmd *cobra.Command, bodyContains, bodyRegex, jsonPath, jsonExpected *string) {
+	cmd.Flags().StringVar(bodyContains, "body-contains", "", `Body must contain this text; a leading "!" means it must be absent ("!error")`)
+	cmd.Flags().StringVar(bodyRegex, "body-regex", "", "Body must match this RE2 regular expression")
+	cmd.Flags().StringVar(jsonPath, "json-path", "", `Parse the body as JSON and require this path to exist ("status", "$.checks.db.ok", "items[0].state")`)
+	cmd.Flags().StringVar(jsonExpected, "json-expected", "", `Value at --json-path must equal this text ("ok", "true", "3"); a leading "!=" inverts ("!=degraded")`)
 }
 
 func newMonitorsToggle(verb string, enabled bool) *cobra.Command {

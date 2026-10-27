@@ -30,6 +30,49 @@ kamu status properties show <property-id>     # includes the browser install sni
 `kamu status properties set` changes a property's name or origin, and
 `kamu status monitors set` changes any setting on an existing monitor.
 
+The full `kamu status` surface (every command takes `--json` for machine output
+where it prints data, and `--key` / `KAMU_ACCESS_KEY` for the access key):
+
+```sh
+kamu status projects   list | show <id> | create --name --slug --org | delete <id>
+kamu status monitors   list <project-id> | add <project-id> | show <id> | set|update <id>
+                       | stats <id> | enable <id> | disable <id> | delete <id>
+kamu status properties list <project-id> | add | show | set | rotate-key | delete
+kamu status pages      list <project-id> | create <project-id> | show <id> | update <id> | delete <id>
+kamu status domains    list <project-id> | verify <domain-id>
+kamu status alerts     list <monitor-id> | add | delete
+kamu status page <slug>                        # public read of a rendered page, no key
+```
+
+HTTP monitors can assert on the response body, checked on every probe run
+(each value up to 1000 characters; on `set`/`update`, pass `""` to clear one):
+
+- `--body-contains TEXT` body must contain TEXT; `!TEXT` means it must be absent
+- `--body-regex RE` body must match the RE2 regular expression RE
+- `--json-path PATH` body must be JSON and PATH must exist (`status`, `$.checks.db.ok`, `items[0].state`)
+- `--json-expected V` value at `--json-path` must equal V (`ok`, `true`, `3`); `!=V` inverts
+
+### Set up a status page with a custom domain
+
+```sh
+kamu status projects list                                  # or: projects create --name Example --slug example --org <kamuid-org-id>
+kamu status monitors add <project-id> --name "API" \
+  --target https://api.example.com/health --interval 60 \
+  --json-path status --json-expected ok                    # down unless {"status":"ok"}
+kamu status monitors add <project-id> --name "Website" --target https://example.com \
+  --body-contains '!Internal Server Error'
+kamu status pages create <project-id> --name "Example" --slug example \
+  --monitor <api-monitor-id> --monitor <website-monitor-id> # live at https://example.kamustatus.com
+kamu status pages update <page-id> --custom-domain status.example.com
+# DNS at your provider:  status.example.com  CNAME  pages.kamustatus.com
+kamu status domains list <project-id>                      # Verified / Pending DNS
+kamu status domains verify <domain-id>                     # re-check now after DNS propagates
+```
+
+`pages update --monitor` replaces the page's monitor set (in the given order),
+`--custom-domain ""` removes the domain, and `--public=false` hides the page.
+A domain another organization already uses is refused with a conflict.
+
 `kamu billing` is the org's own paperwork: which rail it is on, what card is on
 file, and — the part that was previously impossible to get at — the document
 behind each line on your card statement.
