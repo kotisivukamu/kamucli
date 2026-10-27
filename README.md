@@ -64,7 +64,8 @@ kamu status monitors add <project-id> --name "Website" --target https://example.
   --body-contains '!Internal Server Error'
 kamu status pages create <project-id> --name "Example" --slug example \
   --monitor <api-monitor-id> --monitor <website-monitor-id> # live at https://example.kamustatus.com
-kamu status pages update <page-id> --custom-domain status.example.com
+kamu status pages update <page-id> --custom-domain status.example.com \
+  --privacy-url https://example.com/privacy --footer-text "Example Oy"
 # DNS at your provider:  status.example.com  CNAME  pages.kamustatus.com
 kamu status domains list <project-id>                      # Verified / Pending DNS
 kamu status domains verify <domain-id>                     # re-check now after DNS propagates
@@ -72,6 +73,8 @@ kamu status domains verify <domain-id>                     # re-check now after 
 
 `pages update --monitor` replaces the page's monitor set (in the given order),
 `--custom-domain ""` removes the domain, and `--public=false` hides the page.
+`--privacy-url` and `--footer-text` (both also on `create`, max 500 characters)
+render as the public page's footer; pass `""` to remove either.
 A domain another organization already uses is refused with a conflict.
 
 `kamu billing` is the org's own paperwork: which rail it is on, what card is on

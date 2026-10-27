@@ -47,6 +47,7 @@ func (r *recorded) expect(t *testing.T, method, path string) {
 const pageJSON = `{"id":"sp_1","project_id":"p_1","name":"Kontakto","slug":"kontakto","public":true,
 	"title":null,"logo_url":null,"custom_css":null,"custom_domain":"status.kontakto.fi",
 	"custom_domain_verified":false,"cname":"pages.kamustatus.com",
+	"privacy_url":"https://kontakto.fi/tietosuoja","footer_text":"Kontakto Oy",
 	"monitors":[{"id":"m_1","name":"API","type":"http","target":"https://api.example.com/health","display_order":0}]}`
 
 func TestListStatusPages(t *testing.T) {
@@ -65,7 +66,8 @@ func TestCreateStatusPage(t *testing.T) {
 	c, rec := recorder(t, pageJSON)
 	p, err := c.CreateStatusPage(context.Background(), "p_1", map[string]any{
 		"name": "Kontakto", "slug": "kontakto", "monitorIds": []string{"m_1", "m_2"},
-		"customDomain": "status.kontakto.fi",
+		"customDomain": "status.kontakto.fi", "privacyUrl": "https://kontakto.fi/tietosuoja",
+		"footerText": "Kontakto Oy",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +75,8 @@ func TestCreateStatusPage(t *testing.T) {
 	rec.expect(t, "POST", "/api/status/projects/p_1/status-pages")
 	want := map[string]any{
 		"name": "Kontakto", "slug": "kontakto", "monitorIds": []any{"m_1", "m_2"},
-		"customDomain": "status.kontakto.fi",
+		"customDomain": "status.kontakto.fi", "privacyUrl": "https://kontakto.fi/tietosuoja",
+		"footerText": "Kontakto Oy",
 	}
 	if !reflect.DeepEqual(rec.body, want) {
 		t.Errorf("body = %v, want %v", rec.body, want)
@@ -83,6 +86,12 @@ func TestCreateStatusPage(t *testing.T) {
 	}
 	if p.CustomDomainVerified == nil || *p.CustomDomainVerified {
 		t.Errorf("verified = %v, want false", p.CustomDomainVerified)
+	}
+	if p.PrivacyURL == nil || *p.PrivacyURL != "https://kontakto.fi/tietosuoja" {
+		t.Errorf("privacy url = %v", p.PrivacyURL)
+	}
+	if p.FooterText == nil || *p.FooterText != "Kontakto Oy" {
+		t.Errorf("footer text = %v", p.FooterText)
 	}
 	if got := p.PlatformURL(); got != "https://kontakto.kamustatus.com" {
 		t.Errorf("PlatformURL = %q", got)
@@ -102,12 +111,14 @@ func TestGetUpdateDeleteStatusPage(t *testing.T) {
 		t.Errorf("monitors = %+v", p.Monitors)
 	}
 
-	// "" for customDomain is the clear signal and must reach the wire as "".
-	if _, err := c.UpdateStatusPage(ctx, "sp_1", map[string]any{"customDomain": "", "public": false}); err != nil {
+	// "" for customDomain/privacyUrl/footerText is the clear signal and must
+	// reach the wire as "".
+	cleared := map[string]any{"customDomain": "", "privacyUrl": "", "footerText": "", "public": false}
+	if _, err := c.UpdateStatusPage(ctx, "sp_1", cleared); err != nil {
 		t.Fatal(err)
 	}
 	rec.expect(t, "PATCH", "/api/status/status-pages/sp_1")
-	if want := map[string]any{"customDomain": "", "public": false}; !reflect.DeepEqual(rec.body, want) {
+	if want := cleared; !reflect.DeepEqual(rec.body, want) {
 		t.Errorf("body = %v, want %v", rec.body, want)
 	}
 

@@ -23,6 +23,8 @@ type StatusPage struct {
 	CustomCSS            *string             `json:"custom_css"`
 	CustomDomain         *string             `json:"custom_domain"`
 	CustomDomainVerified *bool               `json:"custom_domain_verified"`
+	PrivacyURL           *string             `json:"privacy_url"`
+	FooterText           *string             `json:"footer_text"`
 	CNAME                string              `json:"cname,omitempty"`
 	MonitorCount         int                 `json:"monitor_count,omitempty"`
 	Monitors             []StatusPageMonitor `json:"monitors,omitempty"`
@@ -70,7 +72,7 @@ func (c *Client) ListStatusPages(ctx context.Context, projectID string) ([]Statu
 }
 
 // CreateStatusPage takes the API's camelCase body (name, slug, title, logoUrl,
-// customCss, customDomain, monitorIds).
+// customCss, customDomain, privacyUrl, footerText, monitorIds).
 func (c *Client) CreateStatusPage(ctx context.Context, projectID string, input map[string]any) (*StatusPage, error) {
 	return c.pageCall(ctx, "POST", "/projects/"+projectID+"/status-pages", input)
 }
@@ -79,7 +81,8 @@ func (c *Client) GetStatusPage(ctx context.Context, id string) (*StatusPage, err
 	return c.pageCall(ctx, "GET", "/status-pages/"+id, nil)
 }
 
-// UpdateStatusPage PATCHes a page. customDomain "" clears the domain;
+// UpdateStatusPage PATCHes a page. customDomain, privacyUrl and footerText ""
+// clear the value;
 // monitorIds, when present, replaces the whole set in the given order.
 func (c *Client) UpdateStatusPage(ctx context.Context, id string, updates map[string]any) (*StatusPage, error) {
 	return c.pageCall(ctx, "PATCH", "/status-pages/"+id, updates)

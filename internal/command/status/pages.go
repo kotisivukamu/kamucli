@@ -67,6 +67,7 @@ func newPagesList() *cobra.Command {
 func newPagesCreate() *cobra.Command {
 	var (
 		name, slug, title, logoURL, customDomain string
+		privacyURL, footerText                   string
 		monitors                                 []string
 		asJSON                                   bool
 	)
@@ -83,6 +84,12 @@ func newPagesCreate() *cobra.Command {
 		}
 		if customDomain != "" {
 			input["customDomain"] = customDomain
+		}
+		if privacyURL != "" {
+			input["privacyUrl"] = privacyURL
+		}
+		if footerText != "" {
+			input["footerText"] = footerText
 		}
 		c, err := client()
 		if err != nil {
@@ -113,6 +120,8 @@ func newPagesCreate() *cobra.Command {
 	cmd.Flags().StringVar(&title, "title", "", "Heading shown on the page (defaults to the name)")
 	cmd.Flags().StringVar(&logoURL, "logo-url", "", "Logo image URL")
 	cmd.Flags().StringVar(&customDomain, "custom-domain", "", "Custom hostname, e.g. status.example.com (CNAME it to "+kamustatus.PagesCNAMETarget+")")
+	cmd.Flags().StringVar(&privacyURL, "privacy-url", "", "Privacy policy URL linked in the page footer (http/https)")
+	cmd.Flags().StringVar(&footerText, "footer-text", "", "Text shown in the page footer (max 500 characters)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("slug")
@@ -145,17 +154,20 @@ func newPagesShow() *cobra.Command {
 func newPagesUpdate() *cobra.Command {
 	var (
 		name, title, logoURL, cssFile, customDomain string
+		privacyURL, footerText                      string
 		public, asJSON                              bool
 		monitors                                    []string
 	)
 	// Captured so the runner can tell "not passed" from "passed empty": PATCH
-	// semantics make them different requests (--custom-domain "" clears).
+	// semantics make them different requests (--custom-domain "" clears, as do
+	// --privacy-url "" and --footer-text "").
 	var cmd *cobra.Command
 	cmd = command.New("update", "Change a status page", "", func(ctx context.Context, args []string) error {
 		flags := cmd.Flags()
 		updates := map[string]any{}
 		for flag, key := range map[string]string{
 			"name": "name", "title": "title", "logo-url": "logoUrl", "custom-domain": "customDomain",
+			"privacy-url": "privacyUrl", "footer-text": "footerText",
 		} {
 			if flags.Changed(flag) {
 				v, _ := flags.GetString(flag)
@@ -210,6 +222,8 @@ func newPagesUpdate() *cobra.Command {
 	cmd.Flags().StringVar(&logoURL, "logo-url", "", "Logo image URL")
 	cmd.Flags().StringVar(&cssFile, "custom-css-file", "", "Read custom CSS for the page from this file")
 	cmd.Flags().StringVar(&customDomain, "custom-domain", "", `Custom hostname (CNAME it to `+kamustatus.PagesCNAMETarget+`); "" removes it`)
+	cmd.Flags().StringVar(&privacyURL, "privacy-url", "", `Privacy policy URL linked in the page footer (http/https); "" removes it`)
+	cmd.Flags().StringVar(&footerText, "footer-text", "", `Text shown in the page footer (max 500 characters); "" removes it`)
 	cmd.Flags().BoolVar(&public, "public", false, "Whether the page is publicly visible (--public=false hides it)")
 	cmd.Flags().StringArrayVar(&monitors, "monitor", nil, "Monitor id to show (repeatable); replaces the whole set, in the given order")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
@@ -248,6 +262,12 @@ func printPage(w io.Writer, p *kamustatus.StatusPage) error {
 		rows = append(rows, []string{"logo", *p.LogoURL})
 	}
 	rows = append(rows, []string{"custom domain", domainState(p)})
+	if p.PrivacyURL != nil && *p.PrivacyURL != "" {
+		rows = append(rows, []string{"privacy url", *p.PrivacyURL})
+	}
+	if p.FooterText != nil && *p.FooterText != "" {
+		rows = append(rows, []string{"footer text", *p.FooterText})
+	}
 	if err := render.Table(w, nil, rows); err != nil {
 		return err
 	}
