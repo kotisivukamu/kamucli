@@ -12,6 +12,7 @@ import (
 	"github.com/kotisivukamu/kamucli/internal/command/dns"
 	"github.com/kotisivukamu/kamucli/internal/command/gitcredential"
 	"github.com/kotisivukamu/kamucli/internal/command/orgs"
+	"github.com/kotisivukamu/kamucli/internal/command/publish"
 	"github.com/kotisivukamu/kamucli/internal/command/sites"
 	"github.com/kotisivukamu/kamucli/internal/command/status"
 	"github.com/kotisivukamu/kamucli/internal/command/version"
@@ -47,6 +48,7 @@ func New(bi BuildInfo) *cobra.Command {
 	add(clone.New(), "platform")
 	add(sites.New(), "platform")
 	add(assets.New(), "platform")
+	add(publish.New(), "platform")
 	add(db.New(), "platform")
 	add(bee.New(), "platform")
 	add(dns.New(), "platform")

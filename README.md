@@ -11,6 +11,7 @@ kamu sites list
 kamu clone my-project
 kamu status projects list
 kamu billing invoices
+kamu publish page.html
 ```
 
 `kamu status` talks to **kamustatus**, a kamuhub resource server. It uses the
@@ -92,6 +93,11 @@ covers several orgs. Document URLs are Stripe's own signed links, resolved on
 demand and never stored; `-o` fetches them unauthenticated, so your access key
 never leaves the front door. An invoice on the e-invoice rail has no Stripe
 document — Procountor issues that paperwork, and `procountor_ref` names it.
+`kamu publish <file.html>` puts a self-contained HTML file on the web and prints
+its URL. The platform provisions one forge repo per published file; the command
+commits and pushes, the push deploys, and republishing the same file pushes a
+new commit to the same repo so the URL never moves. `--password` protects the
+page, `kamu publish list` shows what your organization has published.
 
 `kamu clone <project>` clones a project's git repository over HTTPS from the
 platform forge (`git.kamuhub.com`), which hosts repos for **every** project
