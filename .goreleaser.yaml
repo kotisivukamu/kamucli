@@ -87,9 +87,9 @@ homebrew_casks:
     # formula's implicit trust. Strip it at install time.
     hooks:
       post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kamu"]
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/kamu"]
           end
     commit_author:
       name: kamu-release-bot
