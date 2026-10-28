@@ -69,6 +69,7 @@ func newMonitorsAdd() *cobra.Command {
 		name, target, typ, method, dnsType              string
 		bodyContains, bodyRegex, jsonPath, jsonExpected string
 		interval, expectedStatus, timeout, port, grace  int
+		maxResponseTime                                 int
 	)
 	cmd := command.New("add", "Add a monitor", "", func(ctx context.Context, args []string) error {
 		if typ != "heartbeat" && target == "" {
@@ -89,6 +90,9 @@ func newMonitorsAdd() *cobra.Command {
 		}
 		if timeout > 0 {
 			input["timeoutMs"] = timeout
+		}
+		if maxResponseTime > 0 {
+			input["maxResponseTimeMs"] = maxResponseTime
 		}
 		if port > 0 {
 			input["port"] = port
@@ -151,6 +155,7 @@ func newMonitorsAdd() *cobra.Command {
 	cmd.Flags().IntVar(&interval, "interval", 0, "Check interval in seconds")
 	cmd.Flags().IntVar(&expectedStatus, "expected-status", 0, "Expected HTTP status code")
 	cmd.Flags().IntVar(&timeout, "timeout", 0, "Timeout in ms")
+	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail when the response takes longer than this many ms (server default 1000, 0 = off)")
 	cmd.Flags().IntVar(&port, "port", 0, "TCP port")
 	cmd.Flags().StringVar(&dnsType, "dns-type", "", "DNS record type: A, AAAA, CNAME, MX, TXT")
 	cmd.Flags().IntVar(&grace, "grace", 0, "Grace period before marking heartbeat down (seconds)")
@@ -183,6 +188,7 @@ func newMonitorsShow() *cobra.Command {
 			Enabled         bool   `json:"enabled"`
 			IntervalSeconds int    `json:"interval_seconds"`
 			TimeoutMs       int    `json:"timeout_ms"`
+			MaxResponseMs   int    `json:"max_response_time_ms"`
 			PingURL         string `json:"pingUrl"`
 			CertStatus      *struct {
 				CertExpiresAt       *string  `json:"cert_expires_at"`
@@ -208,7 +214,11 @@ func newMonitorsShow() *cobra.Command {
 		}
 		fmt.Fprintf(io.Out, "%s\n", m.Name)
 		fmt.Fprintf(io.Out, "type %s  target %s  enabled %v\n", m.Type, m.Target, m.Enabled)
-		fmt.Fprintf(io.Out, "interval %ds  timeout %dms\n", m.IntervalSeconds, m.TimeoutMs)
+		limit := "off"
+		if m.MaxResponseMs > 0 {
+			limit = fmt.Sprintf("%dms", m.MaxResponseMs)
+		}
+		fmt.Fprintf(io.Out, "interval %ds  timeout %dms  max response time %s\n", m.IntervalSeconds, m.TimeoutMs, limit)
 		if m.PingURL != "" {
 			fmt.Fprintf(io.Out, "ping  %s\n", m.PingURL)
 		}
@@ -331,6 +341,7 @@ func newMonitorsSet() *cobra.Command {
 		name, target, typ, method, dnsType, property    string
 		bodyContains, bodyRegex, jsonPath, jsonExpected string
 		interval, expectedStatus, timeout, port, grace  int
+		maxResponseTime                                 int
 		clearProperty                                   bool
 	)
 	// Captured so the runner can ask which flags were actually given. PATCH
@@ -342,20 +353,21 @@ func newMonitorsSet() *cobra.Command {
 		flags := cmd.Flags()
 		updates := map[string]any{}
 		for flag, val := range map[string]any{
-			"name":            name,
-			"target":          target,
-			"type":            typ,
-			"method":          method,
-			"dns-type":        dnsType,
-			"body-contains":   bodyContains,
-			"body-regex":      bodyRegex,
-			"json-path":       jsonPath,
-			"json-expected":   jsonExpected,
-			"interval":        interval,
-			"expected-status": expectedStatus,
-			"timeout":         timeout,
-			"port":            port,
-			"grace":           grace,
+			"name":              name,
+			"target":            target,
+			"type":              typ,
+			"method":            method,
+			"dns-type":          dnsType,
+			"body-contains":     bodyContains,
+			"body-regex":        bodyRegex,
+			"json-path":         jsonPath,
+			"json-expected":     jsonExpected,
+			"interval":          interval,
+			"expected-status":   expectedStatus,
+			"timeout":           timeout,
+			"max-response-time": maxResponseTime,
+			"port":              port,
+			"grace":             grace,
 		} {
 			if flags.Changed(flag) {
 				updates[monitorPatchKey(flag)] = val
@@ -409,6 +421,7 @@ func newMonitorsSet() *cobra.Command {
 	cmd.Flags().IntVar(&interval, "interval", 0, "Check interval in seconds")
 	cmd.Flags().IntVar(&expectedStatus, "expected-status", 0, "Expected HTTP status code")
 	cmd.Flags().IntVar(&timeout, "timeout", 0, "Timeout in ms")
+	cmd.Flags().IntVar(&maxResponseTime, "max-response-time", 0, "Fail when the response takes longer than this many ms (0 = off)")
 	cmd.Flags().IntVar(&port, "port", 0, "TCP port")
 	cmd.Flags().StringVar(&dnsType, "dns-type", "", "DNS record type: A, AAAA, CNAME, MX, TXT")
 	cmd.Flags().IntVar(&grace, "grace", 0, "Grace period before marking heartbeat down (seconds)")
@@ -429,6 +442,8 @@ func monitorPatchKey(flag string) string {
 		return "expectedStatus"
 	case "timeout":
 		return "timeoutMs"
+	case "max-response-time":
+		return "maxResponseTimeMs"
 	case "dns-type":
 		return "dnsRecordType"
 	case "body-contains":
