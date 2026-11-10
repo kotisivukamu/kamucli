@@ -40,6 +40,9 @@ type StatusPageMonitor struct {
 	Type         string `json:"type"`
 	Target       string `json:"target"`
 	DisplayOrder int    `json:"display_order"`
+	// Subtitle is the page-level line under the monitor's name: nil = the
+	// host derived from the target, "" = hidden, else shown as is.
+	Subtitle *string `json:"subtitle"`
 }
 
 // PlatformURL is the page's always-available address, independent of any

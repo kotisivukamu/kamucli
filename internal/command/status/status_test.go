@@ -83,6 +83,15 @@ func TestPagesUpdateSendsOnlyChangedFields(t *testing.T) {
 	}
 }
 
+func TestPagesUpdateSubtitles(t *testing.T) {
+	calls, _ := run(t, page, "pages", "update", "sp_1",
+		"--subtitle", "m_1=Studio editor", "--subtitle", "m_2=", "--subtitle-auto", "m_3")
+	want := map[string]any{"monitorSubtitles": map[string]any{"m_1": "Studio editor", "m_2": "", "m_3": nil}}
+	if !reflect.DeepEqual(calls[0].body, want) {
+		t.Errorf("PATCH body = %v, want %v", calls[0].body, want)
+	}
+}
+
 func TestPagesCreateBody(t *testing.T) {
 	calls, _ := run(t, page, "pages", "create", "p_1", "--name", "Kontakto", "--slug", "kontakto",
 		"--monitor", "m_1", "--custom-domain", "status.kontakto.fi")

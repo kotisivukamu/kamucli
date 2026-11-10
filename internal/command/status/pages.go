@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -156,7 +157,7 @@ func newPagesUpdate() *cobra.Command {
 		name, title, logoURL, cssFile, customDomain string
 		privacyURL, footerText                      string
 		public, asJSON                              bool
-		monitors                                    []string
+		monitors, subtitles, autoSubtitles          []string
 	)
 	// Captured so the runner can tell "not passed" from "passed empty": PATCH
 	// semantics make them different requests (--custom-domain "" clears, as do
@@ -189,6 +190,20 @@ func newPagesUpdate() *cobra.Command {
 				monitors = []string{}
 			}
 			updates["monitorIds"] = monitors
+		}
+		if len(subtitles)+len(autoSubtitles) > 0 {
+			subs := map[string]any{}
+			for _, s := range subtitles {
+				id, text, ok := strings.Cut(s, "=")
+				if !ok || id == "" {
+					return fmt.Errorf("--subtitle %q: want <monitor-id>=<text>", s)
+				}
+				subs[id] = text
+			}
+			for _, id := range autoSubtitles {
+				subs[id] = nil
+			}
+			updates["monitorSubtitles"] = subs
 		}
 		if len(updates) == 0 {
 			return fmt.Errorf("nothing to change: pass at least one flag (see --help)")
@@ -226,6 +241,8 @@ func newPagesUpdate() *cobra.Command {
 	cmd.Flags().StringVar(&footerText, "footer-text", "", `Text shown in the page footer (max 500 characters); "" removes it`)
 	cmd.Flags().BoolVar(&public, "public", false, "Whether the page is publicly visible (--public=false hides it)")
 	cmd.Flags().StringArrayVar(&monitors, "monitor", nil, "Monitor id to show (repeatable); replaces the whole set, in the given order")
+	cmd.Flags().StringArrayVar(&subtitles, "subtitle", nil, `Line under a monitor's name on this page, as <monitor-id>=<text> (repeatable); "<id>=" hides it`)
+	cmd.Flags().StringArrayVar(&autoSubtitles, "subtitle-auto", nil, "Monitor id whose subtitle goes back to the host from its target (repeatable)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
@@ -282,9 +299,16 @@ func printPage(w io.Writer, p *kamustatus.StatusPage) error {
 	fmt.Fprintln(w, "\nMonitors:")
 	mrows := make([][]string, 0, len(p.Monitors))
 	for _, m := range p.Monitors {
-		mrows = append(mrows, []string{m.ID, m.Name, m.Type, m.Target})
+		sub := "(host)"
+		if m.Subtitle != nil {
+			sub = *m.Subtitle
+			if sub == "" {
+				sub = "(hidden)"
+			}
+		}
+		mrows = append(mrows, []string{m.ID, m.Name, m.Type, m.Target, sub})
 	}
-	return render.Table(w, []string{"ID", "NAME", "TYPE", "TARGET"}, mrows)
+	return render.Table(w, []string{"ID", "NAME", "TYPE", "TARGET", "SUBTITLE"}, mrows)
 }
 
 // domainState renders a page's custom domain with its DNS state.
